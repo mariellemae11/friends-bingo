@@ -408,6 +408,22 @@ html body #root .shell .bingo-call-panel button.bingo-clover-button:focus-visibl
     align-items: flex-start;
     flex-direction: column;
   }
+  /* Permanent fix for the Friends Bingo clover button */
+button.bingo-clover-button,
+button.bingo-clover-button:hover,
+button.bingo-clover-button:focus,
+button.bingo-clover-button:focus-visible,
+button.bingo-clover-button:active {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #f4d68a !important;
+  padding: 8px !important;
+}
 
   .roombar .secondary {
     width: 100%;
