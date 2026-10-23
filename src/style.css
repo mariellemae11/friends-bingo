@@ -424,6 +424,45 @@ button.bingo-clover-button:active {
   color: #f4d68a !important;
   padding: 8px !important;
 }
+  /* FINAL FIX: remove the browser's default white button */
+button.bingo-clover-button,
+button.bingo-clover-button:hover,
+button.bingo-clover-button:focus,
+button.bingo-clover-button:active {
+  all: unset !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  margin: 12px auto !important;
+  padding: 8px !important;
+  color: #f4d68a !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+button.bingo-clover-button svg {
+  display: block !important;
+  width: 100px !important;
+  height: 100px !important;
+  background: transparent !important;
+}
+
+button.bingo-clover-button span {
+  color: #f4d68a !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  font-size: 1.25rem !important;
+  font-weight: 800 !important;
+}
 
   .roombar .secondary {
     width: 100%;
