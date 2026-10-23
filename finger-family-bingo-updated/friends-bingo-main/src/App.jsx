@@ -483,17 +483,21 @@ export default function App() {
 
             <p>{called.length} of 75 numbers called</p>
 
-            <button
-              className="primary"
-              disabled={busy || called.length >= 75}
-              onClick={callNumber}
-            >
-              {busy
-                ? 'Please wait…'
-                : called.length >= 75
-                  ? 'All numbers called'
-                  : 'Call next number'}
-            </button>
+         
+            {player?.id === room?.host_player_id && (
+              <button
+                className="primary"
+                disabled={busy || called.length >= 75}
+                onClick={callNumber}
+              >
+                {busy
+                  ? 'Please wait…'
+                  : called.length >= 75
+                    ? 'All numbers called'
+                    : 'Call next number'}
+              </button>
+            )}
+
 
             <div className="history">
               {[...called].reverse().map(number => (
