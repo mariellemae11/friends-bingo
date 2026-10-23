@@ -699,8 +699,39 @@ export default function App() {
               className="bingo-clover-button"
               onClick={announceBingo}
               aria-label="Call BINGO"
+              style={{
+                all: 'unset',
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                margin: '12px auto',
+                padding: '8px',
+                cursor: 'pointer',
+                color: '#f4d68a',
+                background: 'transparent',
+                backgroundColor: 'transparent',
+                backgroundImage: 'none',
+                border: 'none',
+                borderRadius: 0,
+                boxShadow: 'none',
+                outline: 'none',
+                appearance: 'none',
+                WebkitAppearance: 'none'
+              }}
             >
-              <svg viewBox="0 0 100 100" aria-hidden="true">
+              <svg
+                viewBox="0 0 100 100"
+                aria-hidden="true"
+                style={{
+                  display: 'block',
+                  width: '100px',
+                  height: '100px',
+                  background: 'transparent',
+                  backgroundColor: 'transparent'
+                }}
+              >
                 <g fill="#238636" stroke="#d7b65e" strokeWidth="2">
                   <ellipse cx="50" cy="25" rx="13" ry="19" />
                   <ellipse cx="72" cy="41" rx="13" ry="19" transform="rotate(72 72 41)" />
@@ -716,7 +747,20 @@ export default function App() {
                   strokeLinecap="round"
                 />
               </svg>
-              <span>BINGO!</span>
+              <span
+                style={{
+                  color: '#f4d68a',
+                  background: 'transparent',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  boxShadow: 'none',
+                  fontSize: '1.25rem',
+                  fontWeight: 800,
+                  letterSpacing: '2px'
+                }}
+              >
+                BINGO!
+              </span>
             </button>
           </section>
 
