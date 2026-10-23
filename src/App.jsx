@@ -46,13 +46,13 @@ function makeCode() {
 
   return Array.from(
     { length: 4 },
-    () => characters[Math.floor(Math.random() * characters.length)
-    ]
+    () => characters[Math.floor(Math.random() * characters.length)]
   ).join('');
 }
 
 function getBallLabel(number) {
   if (number === undefined || number === null) return '—';
+
   return `${letters[Math.floor((number - 1) / 15)]} ${number}`;
 }
 
@@ -78,10 +78,12 @@ export default function App() {
   const [message, setMessage] = useState('');
   const [playersLoading, setPlayersLoading] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(true);
+
   const roomChannelRef = useRef(null);
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('room');
+
     if (code) setRoomCode(code.toUpperCase());
   }, []);
 
@@ -94,7 +96,9 @@ export default function App() {
   }, [cards]);
 
   async function getCurrentUser() {
-    if (!supabase) throw new Error('Supabase is not configured.');
+    if (!supabase) {
+      throw new Error('Supabase is not configured.');
+    }
 
     await ensureAnonymousSession();
 
@@ -104,7 +108,10 @@ export default function App() {
     } = await supabase.auth.getUser();
 
     if (error) throw error;
-    if (!user) throw new Error('Could not start your anonymous session.');
+
+    if (!user) {
+      throw new Error('Could not start your anonymous session.');
+    }
 
     return user;
   }
@@ -121,13 +128,18 @@ export default function App() {
         });
 
         if (error) throw error;
-        if (!cancelled) setPlayers(data || []);
+
+        if (!cancelled) {
+          setPlayers(data || []);
+        }
       } catch (error) {
         if (!cancelled) {
           setMessage(`Could not load players: ${error.message}`);
         }
       } finally {
-        if (!cancelled) setPlayersLoading(false);
+        if (!cancelled) {
+          setPlayersLoading(false);
+        }
       }
     }
 
@@ -258,10 +270,12 @@ export default function App() {
       setCards(newCards);
       setCalled(result.room.called_numbers || []);
       setRoomCode(result.room.room_code);
-      setPlayers([{
-        id: result.player.id,
-        player_name: result.player.player_name
-      }]);
+      setPlayers([
+        {
+          id: result.player.id,
+          player_name: result.player.player_name
+        }
+      ]);
 
       setMessage(
         `Room created! Share code ${result.room.room_code} with your friends.`
@@ -312,10 +326,12 @@ export default function App() {
       setCards(newCards);
       setCalled(data.room.called_numbers || []);
       setRoomCode(data.room.room_code);
-      setPlayers([{
-        id: data.player.id,
-        player_name: data.player.player_name
-      }]);
+      setPlayers([
+        {
+          id: data.player.id,
+          player_name: data.player.player_name
+        }
+      ]);
 
       setMessage(`You joined room ${data.room.room_code}.`);
     } catch (error) {
@@ -364,8 +380,10 @@ export default function App() {
     );
 
     try {
-      if (roomChannelRef.current) {
-        const { error } = await roomChannelRef.current.send({
+      const channel = roomChannelRef.current;
+
+      if (channel) {
+        const { error } = await channel.send({
           type: 'broadcast',
           event: 'bingo-called',
           payload: {
@@ -413,14 +431,15 @@ export default function App() {
   async function copyInviteLink() {
     if (!room) return;
 
-    const link =
-      `${window.location.origin}${window.location.pathname}?room=${room.room_code}`;
+    const link = `${window.location.origin}${window.location.pathname}?room=${room.room_code}`;
 
     try {
       await navigator.clipboard.writeText(link);
       setMessage('Invite link copied!');
     } catch {
-      setMessage(`Share this room code with your friends: ${room.room_code}`);
+      setMessage(
+        `Share this room code with your friends: ${room.room_code}`
+      );
     }
   }
 
@@ -428,6 +447,7 @@ export default function App() {
     <main className="shell">
       <header>
         <div className="logo">🎱</div>
+
         <div>
           <h1>Finger Family BINGO</h1>
           <p>Play together. Win together. · 75-ball bingo</p>
@@ -448,7 +468,12 @@ export default function App() {
             />
           </label>
 
-          <button className="primary" disabled={busy} onClick={createRoom}>
+          <button
+            type="button"
+            className="primary"
+            disabled={busy}
+            onClick={createRoom}
+          >
             {busy ? 'Please wait…' : 'Create a room'}
           </button>
 
@@ -461,12 +486,19 @@ export default function App() {
             <input
               value={roomCode}
               maxLength={4}
-              onChange={event => setRoomCode(event.target.value.toUpperCase())}
+              onChange={event =>
+                setRoomCode(event.target.value.toUpperCase())
+              }
               placeholder="e.g. A4BC"
             />
           </label>
 
-          <button className="secondary" disabled={busy} onClick={joinRoom}>
+          <button
+            type="button"
+            className="secondary"
+            disabled={busy}
+            onClick={joinRoom}
+          >
             {busy ? 'Please wait…' : 'Join room'}
           </button>
 
@@ -487,21 +519,26 @@ export default function App() {
               <strong className="roomcode">{room.room_code}</strong>
             </div>
 
-            <button className="secondary" onClick={copyInviteLink}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={copyInviteLink}
+            >
               Copy invite link
             </button>
           </section>
 
           <section className="panel music-panel">
             <h2>🎵 Room Music</h2>
+
             <p className="hint">
               Music controls affect only your device, not the other players.
             </p>
 
             <div className="music-controls">
               <button
-                className="secondary"
                 type="button"
+                className="secondary"
                 onClick={() => setMusicPlaying(current => !current)}
                 aria-pressed={musicPlaying}
               >
@@ -529,13 +566,16 @@ export default function App() {
             <span className="eyebrow">LAST NUMBER CALLED</span>
 
             <div className="ball">
-              {called.length ? getBallLabel(called[called.length - 1]) : '—'}
+              {called.length
+                ? getBallLabel(called[called.length - 1])
+                : '—'}
             </div>
 
             <p>{called.length} of 75 numbers called</p>
 
             {player?.id === room?.host_player_id && (
               <button
+                type="button"
                 className="primary"
                 disabled={busy || called.length >= 75}
                 onClick={callNumber}
@@ -561,12 +601,16 @@ export default function App() {
             <h2>Players in this room ({players.length})</h2>
 
             {players.length === 0 ? (
-              <p className="hint">No players were returned for this room yet.</p>
+              <p className="hint">
+                No players were returned for this room yet.
+              </p>
             ) : (
               players.map(currentPlayer => (
                 <span className="player" key={currentPlayer.id}>
                   {currentPlayer.player_name}
-                  {currentPlayer.id === room.host_player_id ? ' (Host)' : ''}
+                  {currentPlayer.id === room.host_player_id
+                    ? ' (Host)'
+                    : ''}
                 </span>
               ))
             )}
@@ -585,9 +629,9 @@ export default function App() {
             it. Your marks are private to you.
           </p>
 
-          
-          {/* BINGO button with no default browser button background */}
+          {/* One BINGO button only */}
           <section
+            className="bingo-call-panel"
             style={{
               textAlign: 'center',
               background: 'transparent',
@@ -598,20 +642,15 @@ export default function App() {
               marginBottom: '16px'
             }}
           >
-            <p className="hint">A winner?</p>
+            <p className="hint">You think you won?</p>
 
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label="Call BINGO"
+            <button
+              type="button"
+              className="bingo-clover-button"
               onClick={announceBingo}
-              onKeyDown={event => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  announceBingo();
-                }
-              }}
+              aria-label="Call BINGO"
               style={{
+                all: 'unset',
                 display: 'inline-flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -697,90 +736,6 @@ export default function App() {
               >
                 BINGO!
               </span>
-            </div>
-          </section>
-
-          <section
-            className="bingo-call-panel"
-            style={{
-              textAlign: 'center',
-              background: 'transparent',
-              backgroundColor: 'transparent',
-              border: 'none',
-              boxShadow: 'none',
-              padding: '12px 0',
-              marginBottom: '16px'
-            }}
-          >
-            <p className="hint">You think you won?</p>
-
-            <button
-              type="button"
-              onClick={announceBingo}
-              aria-label="Call BINGO"
-              style={{
-                all: 'unset',
-                display: 'inline-flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                margin: '12px auto',
-                padding: '8px',
-                cursor: 'pointer',
-                background: 'transparent',
-                backgroundColor: 'transparent',
-                backgroundImage: 'none',
-                border: 'none',
-                borderRadius: 0,
-                boxShadow: 'none',
-                outline: 'none',
-                appearance: 'none',
-                WebkitAppearance: 'none'
-              }}
-            >
-              <svg
-                viewBox="0 0 100 100"
-                aria-hidden="true"
-                style={{
-                  display: 'block',
-                  width: '100px',
-                  height: '100px',
-                  background: 'transparent',
-                  backgroundColor: 'transparent'
-                }}
-              >
-                <g fill="#238636" stroke="#d7b65e" strokeWidth="2">
-                  <ellipse cx="50" cy="25" rx="13" ry="19" />
-                  <ellipse cx="72" cy="41" rx="13" ry="19" transform="rotate(72 72 41)" />
-                  <ellipse cx="64" cy="66" rx="13" ry="19" transform="rotate(144 64 66)" />
-                  <ellipse cx="36" cy="66" rx="13" ry="19" transform="rotate(216 36 66)" />
-                  <ellipse cx="28" cy="41" rx="13" ry="19" transform="rotate(288 28 41)" />
-                </g>
-
-                <path
-                  d="M50 58 Q53 78 39 94"
-                  fill="none"
-                  stroke="#d7b65e"
-                  strokeWidth="5"
-                  strokeLinecap="round"
-                />
-              </svg>
-
-              <span
-                style={{
-                  color: '#f4d68a',
-                  background: 'transparent',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  boxShadow: 'none',
-                  fontSize: '1.25rem',
-                  fontWeight: 800,
-                  letterSpacing: '2px'
-                }}
-              >
-                BINGO!
-              </span>
             </button>
           </section>
 
@@ -798,6 +753,7 @@ export default function App() {
                     (number, index) => {
                       const isFree = number === 'FREE';
                       const isCalled = !isFree && called.includes(number);
+
                       const isMarked =
                         isFree ||
                         (isCalled && Boolean(card.localMarks?.[index]));
@@ -809,7 +765,9 @@ export default function App() {
                           className={[
                             isFree ? 'free' : '',
                             isMarked ? 'marked' : ''
-                          ].filter(Boolean).join(' ')}
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
                           disabled={!isFree && !isCalled}
                           onClick={() => toggleMark(card.id, index)}
                           title={
