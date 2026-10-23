@@ -585,7 +585,121 @@ export default function App() {
             it. Your marks are private to you.
           </p>
 
-          {/* BINGO button: transparent background, no duplicate button */}
+          
+          {/* BINGO button with no default browser button background */}
+          <section
+            style={{
+              textAlign: 'center',
+              background: 'transparent',
+              backgroundColor: 'transparent',
+              border: 'none',
+              boxShadow: 'none',
+              padding: '12px 0',
+              marginBottom: '16px'
+            }}
+          >
+            <p className="hint">You think you won?</p>
+
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Call BINGO"
+              onClick={announceBingo}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  announceBingo();
+                }
+              }}
+              style={{
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                margin: '12px auto',
+                padding: '8px',
+                cursor: 'pointer',
+                background: 'transparent',
+                backgroundColor: 'transparent',
+                backgroundImage: 'none',
+                border: 'none',
+                borderRadius: 0,
+                boxShadow: 'none',
+                outline: 'none',
+                appearance: 'none',
+                WebkitAppearance: 'none'
+              }}
+            >
+              <svg
+                viewBox="0 0 100 100"
+                aria-hidden="true"
+                style={{
+                  display: 'block',
+                  width: '100px',
+                  height: '100px',
+                  background: 'transparent',
+                  backgroundColor: 'transparent'
+                }}
+              >
+                <g fill="#238636" stroke="#d7b65e" strokeWidth="2">
+                  <ellipse cx="50" cy="25" rx="13" ry="19" />
+                  <ellipse
+                    cx="72"
+                    cy="41"
+                    rx="13"
+                    ry="19"
+                    transform="rotate(72 72 41)"
+                  />
+                  <ellipse
+                    cx="64"
+                    cy="66"
+                    rx="13"
+                    ry="19"
+                    transform="rotate(144 64 66)"
+                  />
+                  <ellipse
+                    cx="36"
+                    cy="66"
+                    rx="13"
+                    ry="19"
+                    transform="rotate(216 36 66)"
+                  />
+                  <ellipse
+                    cx="28"
+                    cy="41"
+                    rx="13"
+                    ry="19"
+                    transform="rotate(288 28 41)"
+                  />
+                </g>
+
+                <path
+                  d="M50 58 Q53 78 39 94"
+                  fill="none"
+                  stroke="#d7b65e"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                />
+              </svg>
+
+              <span
+                style={{
+                  color: '#f4d68a',
+                  background: 'transparent',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  boxShadow: 'none',
+                  fontSize: '1.25rem',
+                  fontWeight: 800,
+                  letterSpacing: '2px'
+                }}
+              >
+                BINGO!
+              </span>
+            </div>
+          </section>
+
           <section
             className="bingo-call-panel"
             style={{
