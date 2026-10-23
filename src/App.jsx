@@ -46,13 +46,13 @@ function makeCode() {
 
   return Array.from(
     { length: 4 },
-    () => characters[Math.floor(Math.random() * characters.length)]
+    () => characters[Math.floor(Math.random() * characters.length)
+    ]
   ).join('');
 }
 
 function getBallLabel(number) {
   if (number === undefined || number === null) return '—';
-
   return `${letters[Math.floor((number - 1) / 15)]} ${number}`;
 }
 
@@ -80,29 +80,21 @@ export default function App() {
   const [musicPlaying, setMusicPlaying] = useState(true);
   const roomChannelRef = useRef(null);
 
-  // Load a room code from an invite link.
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('room');
-
     if (code) setRoomCode(code.toUpperCase());
   }, []);
 
-  // Save this browser session's cards and personal marks.
   useEffect(() => {
     try {
-      sessionStorage.setItem(
-        'friendsBingoCards',
-        JSON.stringify(cards)
-      );
+      sessionStorage.setItem('friendsBingoCards', JSON.stringify(cards));
     } catch (error) {
       console.error('Could not save card marks:', error);
     }
   }, [cards]);
 
   async function getCurrentUser() {
-    if (!supabase) {
-      throw new Error('Supabase is not configured.');
-    }
+    if (!supabase) throw new Error('Supabase is not configured.');
 
     await ensureAnonymousSession();
 
@@ -112,14 +104,11 @@ export default function App() {
     } = await supabase.auth.getUser();
 
     if (error) throw error;
-    if (!user) {
-      throw new Error('Could not start your anonymous session.');
-    }
+    if (!user) throw new Error('Could not start your anonymous session.');
 
     return user;
   }
 
-  // Refresh the shared player list.
   useEffect(() => {
     if (!room?.id || !player?.id || !supabase) return;
 
@@ -132,7 +121,6 @@ export default function App() {
         });
 
         if (error) throw error;
-
         if (!cancelled) setPlayers(data || []);
       } catch (error) {
         if (!cancelled) {
@@ -154,7 +142,6 @@ export default function App() {
     };
   }, [room?.id, player?.id]);
 
-  // Listen for BINGO announcements from other players in this room.
   useEffect(() => {
     if (!room?.id || !player?.id || !supabase) return;
 
@@ -177,7 +164,6 @@ export default function App() {
     };
   }, [room?.id, player?.id]);
 
-  // Refresh called numbers and game state for everyone in the room.
   useEffect(() => {
     if (!room?.id || !player?.id || !supabase) return;
 
@@ -194,9 +180,7 @@ export default function App() {
 
         if (!cancelled && data) {
           setCalled(
-            Array.isArray(data.called_numbers)
-              ? data.called_numbers
-              : []
+            Array.isArray(data.called_numbers) ? data.called_numbers : []
           );
 
           setRoom(current =>
@@ -372,7 +356,6 @@ export default function App() {
     }
   }
 
-  // Let players announce BINGO to everyone in the room.
   async function announceBingo() {
     if (!room || !player) return;
 
@@ -403,22 +386,15 @@ export default function App() {
     }
   }
 
-  // Players can mark or unmark only numbers already called.
   function toggleMark(cardId, index) {
     setCards(currentCards =>
       currentCards.map(card => {
         if (card.id !== cardId) return card;
 
-        const numbers = Array.isArray(card.numbers)
-          ? card.numbers
-          : [];
-
+        const numbers = Array.isArray(card.numbers) ? card.numbers : [];
         const number = numbers[index];
 
-        // The FREE space is always marked.
         if (number === 'FREE') return card;
-
-        // Do not allow marking numbers that have not been called.
         if (!called.includes(number)) return card;
 
         const marks = card.localMarks || {};
@@ -444,9 +420,7 @@ export default function App() {
       await navigator.clipboard.writeText(link);
       setMessage('Invite link copied!');
     } catch {
-      setMessage(
-        `Share this room code with your friends: ${room.room_code}`
-      );
+      setMessage(`Share this room code with your friends: ${room.room_code}`);
     }
   }
 
@@ -474,11 +448,7 @@ export default function App() {
             />
           </label>
 
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={createRoom}
-          >
+          <button className="primary" disabled={busy} onClick={createRoom}>
             {busy ? 'Please wait…' : 'Create a room'}
           </button>
 
@@ -491,18 +461,12 @@ export default function App() {
             <input
               value={roomCode}
               maxLength={4}
-              onChange={event =>
-                setRoomCode(event.target.value.toUpperCase())
-              }
+              onChange={event => setRoomCode(event.target.value.toUpperCase())}
               placeholder="e.g. A4BC"
             />
           </label>
 
-          <button
-            className="secondary"
-            disabled={busy}
-            onClick={joinRoom}
-          >
+          <button className="secondary" disabled={busy} onClick={joinRoom}>
             {busy ? 'Please wait…' : 'Join room'}
           </button>
 
@@ -565,9 +529,7 @@ export default function App() {
             <span className="eyebrow">LAST NUMBER CALLED</span>
 
             <div className="ball">
-              {called.length
-                ? getBallLabel(called[called.length - 1])
-                : '—'}
+              {called.length ? getBallLabel(called[called.length - 1]) : '—'}
             </div>
 
             <p>{called.length} of 75 numbers called</p>
@@ -599,16 +561,12 @@ export default function App() {
             <h2>Players in this room ({players.length})</h2>
 
             {players.length === 0 ? (
-              <p className="hint">
-                No players were returned for this room yet.
-              </p>
+              <p className="hint">No players were returned for this room yet.</p>
             ) : (
               players.map(currentPlayer => (
                 <span className="player" key={currentPlayer.id}>
                   {currentPlayer.player_name}
-                  {currentPlayer.id === room.host_player_id
-                    ? ' (Host)'
-                    : ''}
+                  {currentPlayer.id === room.host_player_id ? ' (Host)' : ''}
                 </span>
               ))
             )}
@@ -627,164 +585,65 @@ export default function App() {
             it. Your marks are private to you.
           </p>
 
-         
-<section
-  className="panel bingo-call-panel"
-  style={{
-    background: 'transparent',
-    backgroundColor: 'transparent',
-    boxShadow: 'none',
-    border: 'none'
-  }}
->
-  <p className="hint">You think you won?</p>
-
-  <button
-    className="bingo-clover-button"
-    type="button"
-    onClick={announceBingo}
-    aria-label="Call BINGO"
-    style={{
-      all: 'unset',
-      display: 'inline-flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '8px',
-      cursor: 'pointer',
-      background: 'none',
-      backgroundColor: 'transparent',
-      border: 'none',
-      boxShadow: 'none',
-      outline: 'none',
-      padding: '8px'
-    }}
-  >
-    <svg
-      viewBox="0 0 100 100"
-      role="img"
-      aria-hidden="true"
-      style={{
-        display: 'block',
-        background: 'none',
-        backgroundColor: 'transparent',
-        width: '100px',
-        height: '100px',
-        overflow: 'visible'
-      }}
-    >
-      <g fill="#238636" stroke="#d7b65e" strokeWidth="2">
-        <ellipse cx="50" cy="25" rx="13" ry="19" />
-        <ellipse
-          cx="72"
-          cy="41"
-          rx="13"
-          ry="19"
-          transform="rotate(72 72 41)"
-        />
-        <ellipse
-          cx="64"
-          cy="66"
-          rx="13"
-          ry="19"
-          transform="rotate(144 64 66)"
-        />
-        <ellipse
-          cx="36"
-          cy="66"
-          rx="13"
-          ry="19"
-          transform="rotate(216 36 66)"
-        />
-        <ellipse
-          cx="28"
-          cy="41"
-          rx="13"
-          ry="19"
-          transform="rotate(288 28 41)"
-        />
-      </g>
-      <path
-        d="M50 58 Q53 78 39 94"
-        fill="none"
-        stroke="#d7b65e"
-        strokeWidth="5"
-        strokeLinecap="round"
-      />
-    </svg>
-
-    <span
-      style={{
-        background: 'transparent',
-        backgroundColor: 'transparent',
-        color: 'inherit',
-        border: 'none',
-        boxShadow: 'none'
-      }}
-    >
-      BINGO!
-    </span>
-  </button>
-</section>
-
+          {/* BINGO button: transparent background, no duplicate button */}
+          <section
+            className="bingo-call-panel"
+            style={{
+              textAlign: 'center',
+              background: 'transparent',
+              backgroundColor: 'transparent',
+              border: 'none',
+              boxShadow: 'none',
+              padding: '12px 0',
+              marginBottom: '16px'
+            }}
+          >
             <p className="hint">You think you won?</p>
 
             <button
-              className="bingo-clover-button"
               type="button"
               onClick={announceBingo}
               aria-label="Call BINGO"
               style={{
+                all: 'unset',
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                margin: '12px auto',
+                padding: '8px',
+                cursor: 'pointer',
                 background: 'transparent',
                 backgroundColor: 'transparent',
-                boxShadow: 'none',
+                backgroundImage: 'none',
                 border: 'none',
-                padding: '8px',
-                cursor: 'pointer'
+                borderRadius: 0,
+                boxShadow: 'none',
+                outline: 'none',
+                appearance: 'none',
+                WebkitAppearance: 'none'
               }}
             >
               <svg
                 viewBox="0 0 100 100"
-                role="img"
                 aria-hidden="true"
                 style={{
                   display: 'block',
-                  background: 'transparent',
                   width: '100px',
-                  height: '100px'
+                  height: '100px',
+                  background: 'transparent',
+                  backgroundColor: 'transparent'
                 }}
               >
-                <g fill="currentColor" stroke="#d7b65e" strokeWidth="2">
+                <g fill="#238636" stroke="#d7b65e" strokeWidth="2">
                   <ellipse cx="50" cy="25" rx="13" ry="19" />
-                  <ellipse
-                    cx="72"
-                    cy="41"
-                    rx="13"
-                    ry="19"
-                    transform="rotate(72 72 41)"
-                  />
-                  <ellipse
-                    cx="64"
-                    cy="66"
-                    rx="13"
-                    ry="19"
-                    transform="rotate(144 64 66)"
-                  />
-                  <ellipse
-                    cx="36"
-                    cy="66"
-                    rx="13"
-                    ry="19"
-                    transform="rotate(216 36 66)"
-                  />
-                  <ellipse
-                    cx="28"
-                    cy="41"
-                    rx="13"
-                    ry="19"
-                    transform="rotate(288 28 41)"
-                  />
+                  <ellipse cx="72" cy="41" rx="13" ry="19" transform="rotate(72 72 41)" />
+                  <ellipse cx="64" cy="66" rx="13" ry="19" transform="rotate(144 64 66)" />
+                  <ellipse cx="36" cy="66" rx="13" ry="19" transform="rotate(216 36 66)" />
+                  <ellipse cx="28" cy="41" rx="13" ry="19" transform="rotate(288 28 41)" />
                 </g>
+
                 <path
                   d="M50 58 Q53 78 39 94"
                   fill="none"
@@ -794,7 +653,20 @@ export default function App() {
                 />
               </svg>
 
-              <span>BINGO!</span>
+              <span
+                style={{
+                  color: '#f4d68a',
+                  background: 'transparent',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  boxShadow: 'none',
+                  fontSize: '1.25rem',
+                  fontWeight: 800,
+                  letterSpacing: '2px'
+                }}
+              >
+                BINGO!
+              </span>
             </button>
           </section>
 
@@ -811,8 +683,7 @@ export default function App() {
                   {(Array.isArray(card.numbers) ? card.numbers : []).map(
                     (number, index) => {
                       const isFree = number === 'FREE';
-                      const isCalled =
-                        !isFree && called.includes(number);
+                      const isCalled = !isFree && called.includes(number);
                       const isMarked =
                         isFree ||
                         (isCalled && Boolean(card.localMarks?.[index]));
