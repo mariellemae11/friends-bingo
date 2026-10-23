@@ -93,3 +93,24 @@ footer { text-align: center; color: #9fb6a5; font-size: 12px; margin-top: 24px; 
   .roombar { align-items: flex-start; flex-direction: column; }
   .roombar .secondary { width: 100%; }
 }
+/* Finger Family logo: continuous 360-degree spin */
+.logo {
+  animation: fingerFamilySpin 3s linear infinite;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+}
+
+@keyframes fingerFamilySpin {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo {
+    animation: none;
+  }
+}
