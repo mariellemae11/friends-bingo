@@ -627,7 +627,106 @@ export default function App() {
             it. Your marks are private to you.
           </p>
 
-          <section className="panel bingo-call-panel">
+         
+<section
+  className="panel bingo-call-panel"
+  style={{
+    background: 'transparent',
+    backgroundColor: 'transparent',
+    boxShadow: 'none',
+    border: 'none'
+  }}
+>
+  <p className="hint">You think you won?</p>
+
+  <button
+    className="bingo-clover-button"
+    type="button"
+    onClick={announceBingo}
+    aria-label="Call BINGO"
+    style={{
+      all: 'unset',
+      display: 'inline-flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      background: 'none',
+      backgroundColor: 'transparent',
+      border: 'none',
+      boxShadow: 'none',
+      outline: 'none',
+      padding: '8px'
+    }}
+  >
+    <svg
+      viewBox="0 0 100 100"
+      role="img"
+      aria-hidden="true"
+      style={{
+        display: 'block',
+        background: 'none',
+        backgroundColor: 'transparent',
+        width: '100px',
+        height: '100px',
+        overflow: 'visible'
+      }}
+    >
+      <g fill="#238636" stroke="#d7b65e" strokeWidth="2">
+        <ellipse cx="50" cy="25" rx="13" ry="19" />
+        <ellipse
+          cx="72"
+          cy="41"
+          rx="13"
+          ry="19"
+          transform="rotate(72 72 41)"
+        />
+        <ellipse
+          cx="64"
+          cy="66"
+          rx="13"
+          ry="19"
+          transform="rotate(144 64 66)"
+        />
+        <ellipse
+          cx="36"
+          cy="66"
+          rx="13"
+          ry="19"
+          transform="rotate(216 36 66)"
+        />
+        <ellipse
+          cx="28"
+          cy="41"
+          rx="13"
+          ry="19"
+          transform="rotate(288 28 41)"
+        />
+      </g>
+      <path
+        d="M50 58 Q53 78 39 94"
+        fill="none"
+        stroke="#d7b65e"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+    </svg>
+
+    <span
+      style={{
+        background: 'transparent',
+        backgroundColor: 'transparent',
+        color: 'inherit',
+        border: 'none',
+        boxShadow: 'none'
+      }}
+    >
+      BINGO!
+    </span>
+  </button>
+</section>
+
             <p className="hint">You think you won?</p>
 
             <button
