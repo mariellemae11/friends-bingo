@@ -68,3 +68,9 @@
   font-weight: 800;
   letter-spacing: 2px;
 }
+.bingo-button {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none;
+  border: none;
+}
