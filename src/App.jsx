@@ -598,7 +598,7 @@ export default function App() {
               marginBottom: '16px'
             }}
           >
-            <p className="hint">You think you won?</p>
+            <p className="hint">A winner?</p>
 
             <div
               role="button"
