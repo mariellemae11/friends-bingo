@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   supabase,
   supabaseConfigured,
@@ -77,6 +77,8 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [playersLoading, setPlayersLoading] = useState(false);
+  const [musicPlaying, setMusicPlaying] = useState(true);
+  const roomChannelRef = useRef(null);
 
   // Load a room code from an invite link.
   useEffect(() => {
@@ -149,6 +151,29 @@ export default function App() {
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+    };
+  }, [room?.id, player?.id]);
+
+  // Listen for BINGO announcements from other players in this room.
+  useEffect(() => {
+    if (!room?.id || !player?.id || !supabase) return;
+
+    const channel = supabase
+      .channel(`bingo-room-${room.id}`)
+      .on('broadcast', { event: 'bingo-called' }, ({ payload }) => {
+        if (payload?.player_name) {
+          setMessage(
+            `🍀 ${payload.player_name} called BINGO! The host can verify the card.`
+          );
+        }
+      })
+      .subscribe();
+
+    roomChannelRef.current = channel;
+
+    return () => {
+      roomChannelRef.current = null;
+      supabase.removeChannel(channel);
     };
   }, [room?.id, player?.id]);
 
@@ -347,6 +372,37 @@ export default function App() {
     }
   }
 
+  // Let players announce BINGO to everyone in the room.
+  async function announceBingo() {
+    if (!room || !player) return;
+
+    setMessage(
+      '🍀 You called BINGO! Waiting for the host to verify your card.'
+    );
+
+    try {
+      if (roomChannelRef.current) {
+        const { error } = await roomChannelRef.current.send({
+          type: 'broadcast',
+          event: 'bingo-called',
+          payload: {
+            player_name: player.player_name || name || 'A player'
+          }
+        });
+
+        if (error) throw error;
+      } else {
+        setMessage(
+          'Your BINGO was called, but the room announcement is not connected yet.'
+        );
+      }
+    } catch (error) {
+      setMessage(
+        `BINGO! Your announcement may not have reached everyone: ${error.message}`
+      );
+    }
+  }
+
   // Players can mark or unmark only numbers already called.
   function toggleMark(cardId, index) {
     setCards(currentCards =>
@@ -399,8 +455,8 @@ export default function App() {
       <header>
         <div className="logo">🎱</div>
         <div>
-          <h1>Friends Bingo</h1>
-          <p>75-ball bingo · four cards each</p>
+          <h1>Finger Family BINGO</h1>
+          <p>Play together. Win together. · 75-ball bingo</p>
         </div>
       </header>
 
@@ -472,6 +528,39 @@ export default function App() {
             </button>
           </section>
 
+          <section className="panel music-panel">
+            <h2>🎵 Room Music</h2>
+            <p className="hint">
+              Music controls affect only your device, not the other players.
+            </p>
+
+            <div className="music-controls">
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setMusicPlaying(current => !current)}
+                aria-pressed={musicPlaying}
+              >
+                {musicPlaying ? '⏸ Pause Music' : '▶ Play Music'}
+              </button>
+            </div>
+
+            {musicPlaying && (
+              <div className="music-player">
+                <iframe
+                  key="finger-family-music"
+                  width="100%"
+                  height="80"
+                  src="https://www.youtube.com/embed/WHwndCEnOec?autoplay=1&controls=1&playsinline=1&rel=0"
+                  title="Finger Family BINGO background music"
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
+                />
+              </div>
+            )}
+          </section>
+
           <section className="panel caller">
             <span className="eyebrow">LAST NUMBER CALLED</span>
 
@@ -483,17 +572,19 @@ export default function App() {
 
             <p>{called.length} of 75 numbers called</p>
 
-            <button
-              className="primary"
-              disabled={busy || called.length >= 75}
-              onClick={callNumber}
-            >
-              {busy
-                ? 'Please wait…'
-                : called.length >= 75
-                  ? 'All numbers called'
-                  : 'Call next number'}
-            </button>
+            {player?.id === room?.host_player_id && (
+              <button
+                className="primary"
+                disabled={busy || called.length >= 75}
+                onClick={callNumber}
+              >
+                {busy
+                  ? 'Please wait…'
+                  : called.length >= 75
+                    ? 'All numbers called'
+                    : 'Call next number'}
+              </button>
+            )}
 
             <div className="history">
               {[...called].reverse().map(number => (
@@ -535,6 +626,78 @@ export default function App() {
             When a number is called, tap that number on your card to highlight
             it. Your marks are private to you.
           </p>
+
+          <section className="panel bingo-call-panel">
+            <p className="hint">You think you won?</p>
+
+            <button
+              className="bingo-clover-button"
+              type="button"
+              onClick={announceBingo}
+              aria-label="Call BINGO"
+              style={{
+                background: 'transparent',
+                backgroundColor: 'transparent',
+                boxShadow: 'none',
+                border: 'none',
+                padding: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              <svg
+                viewBox="0 0 100 100"
+                role="img"
+                aria-hidden="true"
+                style={{
+                  display: 'block',
+                  background: 'transparent',
+                  width: '100px',
+                  height: '100px'
+                }}
+              >
+                <g fill="currentColor" stroke="#d7b65e" strokeWidth="2">
+                  <ellipse cx="50" cy="25" rx="13" ry="19" />
+                  <ellipse
+                    cx="72"
+                    cy="41"
+                    rx="13"
+                    ry="19"
+                    transform="rotate(72 72 41)"
+                  />
+                  <ellipse
+                    cx="64"
+                    cy="66"
+                    rx="13"
+                    ry="19"
+                    transform="rotate(144 64 66)"
+                  />
+                  <ellipse
+                    cx="36"
+                    cy="66"
+                    rx="13"
+                    ry="19"
+                    transform="rotate(216 36 66)"
+                  />
+                  <ellipse
+                    cx="28"
+                    cy="41"
+                    rx="13"
+                    ry="19"
+                    transform="rotate(288 28 41)"
+                  />
+                </g>
+                <path
+                  d="M50 58 Q53 78 39 94"
+                  fill="none"
+                  stroke="#d7b65e"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                />
+              </svg>
+
+              <span>BINGO!</span>
+            </button>
+          </section>
 
           <div className="cards">
             {cards.map(card => (
@@ -593,7 +756,7 @@ export default function App() {
         </>
       )}
 
-      <footer>Made for game night with friends 💜</footer>
+      <footer>Made for game night with Finger Family 💚</footer>
     </main>
   );
 }
