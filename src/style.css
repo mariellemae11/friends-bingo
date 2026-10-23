@@ -70,6 +70,29 @@
 }
 .bingo-button {
   background: transparent !important;
+  
+button.bingo-clover-button,
+.bingo-clover-button,
+.bingo-clover-button:hover,
+.bingo-clover-button:focus,
+.bingo-clover-button:active {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.bingo-clover-button::before,
+.bingo-clover-button::after {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
   background-color: transparent !important;
   box-shadow: none;
   border: none;
