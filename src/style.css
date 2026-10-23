@@ -1,4 +1,250 @@
-:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#241d35;background:#f6f3fc;font-synthesis:none;text-rendering:optimizeLegibility}*{box-sizing:border-box}body{margin:0}.shell{max-width:900px;margin:0 auto;padding:28px 18px 50px}header{display:flex;align-items:center;gap:14px;margin-bottom:24px}.logo{height:54px;width:54px;border-radius:16px;background:#5b36b5;color:white;display:grid;place-items:center;font-size:28px}h1{font-size:27px;margin:0}header p{margin:3px 0 0;color:#777085}.panel{background:white;border:1px solid #e8e0f5;border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:0 8px 28px #37205b0a}h2{font-size:19px;margin:0 0 15px}label{display:block;font-size:14px;font-weight:700;margin:14px 0}input{display:block;width:100%;border:1px solid #d9d0e8;border-radius:10px;padding:12px;font:inherit;margin-top:7px}button{font:inherit;cursor:pointer}.primary,.secondary{border-radius:10px;padding:11px 15px;font-weight:750;border:0}.primary{background:#5b36b5;color:white;width:100%;margin-top:8px}.secondary{background:#f0eaff;color:#5633a9;border:1px solid #e0d5fa}.separator{text-align:center;color:#8b8398;font-size:12px;margin:18px 0}.message,.hint{font-size:13px;line-height:1.5;color:#675b7b;overflow-wrap:anywhere}.roombar{display:flex;justify-content:space-between;align-items:center;gap:12px}.eyebrow{display:block;font-size:11px;letter-spacing:1px;color:#817593;font-weight:800}.roomcode{display:block;font-size:27px;letter-spacing:3px;color:#5b36b5;margin-top:4px}.caller{text-align:center}.ball{height:92px;width:92px;border-radius:50%;background:#eee7ff;color:#5b36b5;font-weight:900;font-size:25px;display:grid;place-items:center;margin:16px auto}.history{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:16px}.history span,.player{background:#f0eaff;color:#5633a9;border-radius:20px;padding:5px 9px;font-size:12px;font-weight:700}.player{display:inline-block;margin:0 5px 5px 0}.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.bcard{background:white;border:1px solid #e8e0f5;border-radius:14px;padding:10px;min-width:0}.bcard h3{text-align:center;margin:3px 0 9px;font-size:13px}.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}.grid b{color:#5b36b5;text-align:center;padding:4px 0}.grid button{border:0;background:#f5f2fa;border-radius:5px;aspect-ratio:1;min-width:0;padding:0;font-size:clamp(10px,2vw,14px);font-weight:700;color:#302642}.grid button.marked{background:#5b36b5;color:white}.grid button.free{background:#d9f6e5;color:#17663d}footer{text-align:center;color:#8a8296;font-size:12px;margin-top:24px}@media(max-width:500px){.shell{padding:18px 12px 35px}.panel{padding:15px}.cards{gap:8px}.bcard{padding:6px}.grid{gap:3px}.roombar{align-items:flex-start;flex-direction:column}.roombar .secondary{width:100%}}
+
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #241d35;
+  background: #f6f3fc;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 28px 18px 50px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.logo {
+  height: 54px;
+  width: 54px;
+  border-radius: 16px;
+  background: #5b36b5;
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+}
+
+h1 {
+  font-size: 27px;
+  margin: 0;
+}
+
+header p {
+  margin: 3px 0 0;
+  color: #777085;
+}
+
+.panel {
+  background: white;
+  border: 1px solid #e8e0f5;
+  border-radius: 18px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 28px #37205b0a;
+}
+
+h2 {
+  font-size: 19px;
+  margin: 0 0 15px;
+}
+
+label {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 14px 0;
+}
+
+input {
+  display: block;
+  width: 100%;
+  border: 1px solid #d9d0e8;
+  border-radius: 10px;
+  padding: 12px;
+  font: inherit;
+  margin-top: 7px;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.primary,
+.secondary {
+  border-radius: 10px;
+  padding: 11px 15px;
+  font-weight: 750;
+  border: 0;
+}
+
+.primary {
+  background: #5b36b5;
+  color: white;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.secondary {
+  background: #f0eaff;
+  color: #5633a9;
+  border: 1px solid #e0d5fa;
+}
+
+.separator {
+  text-align: center;
+  color: #8b8398;
+  font-size: 12px;
+  margin: 18px 0;
+}
+
+.message,
+.hint {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #675b7b;
+  overflow-wrap: anywhere;
+}
+
+.roombar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.eyebrow {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #817593;
+  font-weight: 800;
+}
+
+.roomcode {
+  display: block;
+  font-size: 27px;
+  letter-spacing: 3px;
+  color: #5b36b5;
+  margin-top: 4px;
+}
+
+.caller {
+  text-align: center;
+}
+
+.ball {
+  height: 92px;
+  width: 92px;
+  border-radius: 50%;
+  background: #eee7ff;
+  color: #5b36b5;
+  font-weight: 900;
+  font-size: 25px;
+  display: grid;
+  place-items: center;
+  margin: 16px auto;
+}
+
+.history {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.history span,
+.player {
+  background: #f0eaff;
+  color: #5633a9;
+  border-radius: 20px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.player {
+  display: inline-block;
+  margin: 0 5px 5px 0;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bcard {
+  background: white;
+  border: 1px solid #e8e0f5;
+  border-radius: 14px;
+  padding: 10px;
+  min-width: 0;
+}
+
+.bcard h3 {
+  text-align: center;
+  margin: 3px 0 9px;
+  font-size: 13px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.grid b {
+  color: #5b36b5;
+  text-align: center;
+  padding: 4px 0;
+}
+
+.grid button {
+  border: 0;
+  background: #f5f2fa;
+  border-radius: 5px;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  font-size: clamp(10px, 2vw, 14px);
+  font-weight: 700;
+  color: #302642;
+}
+
+.grid button.marked {
+  background: #5b36b5;
+  color: white;
+}
+
+.grid button.free {
+  background: #d9f6e5;
+  color: #17663d;
+}
+
+footer {
+  text-align: center;
+  color: #8a8296;
+  font-size: 12px;
+  margin-top: 24px;
+}
 
 /* Background music player */
 .music-panel {
@@ -25,17 +271,23 @@
   border-radius: 12px;
 }
 
-
-/* Five-leaf clover BINGO button */
+/* BINGO clover section */
 .bingo-call-panel {
   text-align: center;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
-.bingo-clover-button,
-.bingo-clover-button:hover,
-.bingo-clover-button:focus,
-.bingo-clover-button:active {
-  all: unset !important;
+/*
+  These rules apply only if the BINGO clover uses
+  className="bingo-clover-button".
+*/
+button.bingo-clover-button,
+button.bingo-clover-button:hover,
+button.bingo-clover-button:focus,
+button.bingo-clover-button:active {
   display: inline-flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -44,6 +296,9 @@
   margin: 12px auto !important;
   padding: 8px !important;
   min-width: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  color: inherit !important;
   border: none !important;
   border-radius: 0 !important;
   background: transparent !important;
@@ -51,9 +306,15 @@
   background-image: none !important;
   box-shadow: none !important;
   outline: none !important;
-  cursor: pointer !important;
   appearance: none !important;
   -webkit-appearance: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.bingo-clover-button::before,
+button.bingo-clover-button::after {
+  content: none !important;
+  display: none !important;
 }
 
 .bingo-clover-button svg {
@@ -61,20 +322,48 @@
   width: 100px;
   height: 100px;
   background: transparent !important;
+  background-color: transparent !important;
 }
 
 .bingo-clover-button span {
-  color: #f4d68a;
+  color: #f4d68a !important;
   font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: 2px;
   background: transparent !important;
+  background-color: transparent !important;
   box-shadow: none !important;
   border: none !important;
 }
 
-.bingo-clover-button::before,
-.bingo-clover-button::after {
-  content: none !important;
-  display: none !important;
+@media (max-width: 500px) {
+  .shell {
+    padding: 18px 12px 35px;
+  }
+
+  .panel {
+    padding: 15px;
+  }
+
+  .cards {
+    gap: 8px;
+  }
+
+  .bcard {
+    padding: 6px;
+  }
+
+  .grid {
+    gap: 3px;
+  }
+
+  .roombar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .roombar .secondary {
+    width: 100%;
+  }
 }
+
