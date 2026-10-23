@@ -25,41 +25,42 @@
   border-radius: 12px;
 }
 
+
 /* Five-leaf clover BINGO button */
 .bingo-call-panel {
   text-align: center;
 }
 
-.bingo-clover-button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  margin: 12px auto;
-  padding: 16px 24px;
-  min-width: 150px;
-  border: 2px solid #d7b65e;
-  border-radius: 20px;
-  background: linear-gradient(145deg, #164c32, #092719);
-  color: #48a95f;
-  box-shadow: 0 0 18px #d7b65e25;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.bingo-clover-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 24px #d7b65e55;
-}
-
+.bingo-clover-button,
+.bingo-clover-button:hover,
+.bingo-clover-button:focus,
 .bingo-clover-button:active {
-  transform: scale(0.96);
+  all: unset !important;
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  margin: 12px auto !important;
+  padding: 8px !important;
+  min-width: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  cursor: pointer !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
 }
 
 .bingo-clover-button svg {
-  width: 76px;
-  height: 76px;
+  display: block;
+  width: 100px;
+  height: 100px;
+  background: transparent !important;
 }
 
 .bingo-clover-button span {
@@ -67,33 +68,13 @@
   font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: 2px;
-}
-.bingo-button {
   background: transparent !important;
-  
-button.bingo-clover-button,
-.bingo-clover-button,
-.bingo-clover-button:hover,
-.bingo-clover-button:focus,
-.bingo-clover-button:active {
-  background: transparent !important;
-  background-color: transparent !important;
   box-shadow: none !important;
   border: none !important;
-  outline: none;
-  appearance: none;
-  -webkit-appearance: none;
 }
 
 .bingo-clover-button::before,
 .bingo-clover-button::after {
-  background: transparent !important;
-  background-color: transparent !important;
-  box-shadow: none !important;
-  border: none !important;
-}
-
-  background-color: transparent !important;
-  box-shadow: none;
-  border: none;
+  content: none !important;
+  display: none !important;
 }
