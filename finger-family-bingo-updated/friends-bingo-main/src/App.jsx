@@ -399,7 +399,7 @@ export default function App() {
       <header>
         <img className="logo" src="/finger-family-logo.jpg" alt="Finger Family emblem logo" />
         <div>
-          <h1>Finger Family Bingo</h1>
+          <h1>Finger Family BINGO</h1>
           <p>Play together. Win together. · 75-ball bingo</p>
         </div>
       </header>
