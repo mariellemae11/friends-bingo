@@ -83,6 +83,7 @@ const [bingoClaims, setBingoClaims] = useState([]);
 const [selectedBingoCards, setSelectedBingoCards] = useState([]);
   const [musicPlaying, setMusicPlaying] = useState(true);
   const roomChannelRef = useRef(null);
+const hasLeftRoomRef = useRef(false);
   // Remember the last room code in this browser.
   useEffect(() => {
     if (roomCode) {
@@ -160,7 +161,7 @@ const [selectedBingoCards, setSelectedBingoCards] = useState([]);
         return;
       }
 
-      if (!savedCode) return;
+      if (!savedCode || hasLeftRoomRef.current) return;
 
       try {
         await ensureAnonymousSession();
@@ -171,7 +172,7 @@ const [selectedBingoCards, setSelectedBingoCards] = useState([]);
         );
 
         if (error) throw error;
-        if (cancelled || !data?.room || !data?.player) return;
+        if (cancelled || hasLeftRoomRef.current || !data?.room || !data?.player) return;
 
         const recoveredCards = (data.cards || []).map(card => ({
           ...card,
@@ -648,7 +649,37 @@ async function joinRoom() {
     }
   }
 
-  // Players can mark or unmark only numbers already called.
+  function returnToMainScreen() {
+  if (busy) return;
+
+  hasLeftRoomRef.current = true;
+
+    setRoom(null);
+    setPlayer(null);
+    setCards([]);
+    setCalled([]);
+    setPlayers([]);
+    setWinnerHistory([]);
+    setWinnerName('');
+    setBingoClaims([]);
+    setSelectedBingoCards([]);
+    setRoomCode('');
+    setMessage('You have left the game. You can create or join another room.');
+
+    try {
+      localStorage.removeItem('friendsBingoRoomCode');
+    } catch (error) {
+      console.error('Could not clear saved room code:', error);
+    }
+
+    try {
+      sessionStorage.removeItem('friendsBingoCards');
+    } catch (error) {
+      console.error('Could not clear saved cards:', error);
+    }
+  }
+
+    // Players can mark or unmark only numbers already called.
   function toggleMark(cardId, index) {
     setCards(currentCards =>
       currentCards.map(card => {
@@ -969,10 +1000,24 @@ async function reviewBingoCard(claimId, cardId, decision) {
                 </span>
               ))}
             </div>
+          
           </section>
+
+          <section className="panel room-exit-controls">
+            <button
+              className="secondary"
+              type="button"
+              disabled={busy}
+              onClick={returnToMainScreen}
+            >
+              🏠 Back to Main Screen
+            </button>
+
+                    </section>
 
           <section className="panel">
             <h2>Players in this room ({players.length})</h2>
+
 
             {players.length === 0 ? (
               <p className="hint">
