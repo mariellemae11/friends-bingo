@@ -328,8 +328,7 @@ export default function App() {
       setBusy(false);
     }
   }
-
-  async function joinRoom() {
+async function joinRoom() {
     if (!name.trim() || !roomCode.trim()) {
       setMessage('Enter your name and room code.');
       return;
@@ -346,8 +345,43 @@ export default function App() {
     try {
       await getCurrentUser();
 
+      const normalizedRoomCode = roomCode.trim().toUpperCase();
+
+      // First, try to recover this guest's existing room and cards.
+      const {
+        data: recovered,
+        error: recoveryError
+      } = await supabase.rpc('recover_bingo_player', {
+        p_room_code: normalizedRoomCode
+      });
+
+      if (recoveryError) throw recoveryError;
+
+      if (recovered?.room && recovered?.player) {
+        const recoveredCards = (recovered.cards || []).map(card => ({
+          ...card,
+          localMarks: {}
+        }));
+
+        setRoom(recovered.room);
+        setPlayer(recovered.player);
+        setCards(recoveredCards);
+        setCalled(recovered.room.called_numbers || []);
+        setRoomCode(recovered.room.room_code);
+        setPlayers([{
+          id: recovered.player.id,
+          player_name: recovered.player.player_name
+        }]);
+
+        setMessage(
+          `Welcome back to room ${recovered.room.room_code}! Your saved cards have been restored.`
+        );
+        return;
+      }
+
+      // If this account has never joined this room, join as a new player.
       const { data, error } = await supabase.rpc('join_bingo_room', {
-        p_room_code: roomCode.trim().toUpperCase(),
+        p_room_code: normalizedRoomCode,
         p_player_name: name.trim(),
         p_cards: Array.from({ length: 4 }, () => makeCard())
       });
@@ -380,6 +414,7 @@ export default function App() {
       setBusy(false);
     }
   }
+
 
   async function callNumber() {
     if (!room || !player || busy) return;
