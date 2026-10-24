@@ -79,14 +79,34 @@ export default function App() {
   const [playersLoading, setPlayersLoading] = useState(false);
   const [winnerHistory, setWinnerHistory] = useState([]);
   const [winnerName, setWinnerName] = useState('');
+const [bingoClaims, setBingoClaims] = useState([]);
+const [selectedBingoCards, setSelectedBingoCards] = useState([]);
   const [musicPlaying, setMusicPlaying] = useState(true);
   const roomChannelRef = useRef(null);
-
-  // Load a room code from an invite link.
+  // Remember the last room code in this browser.
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get('room');
+    if (roomCode) {
+      try {
+        localStorage.setItem('friendsBingoRoomCode', roomCode);
+      } catch (error) {
+        console.error('Could not save room code:', error);
+      }
+    }
+  }, [roomCode]);
+    // Load a room code from an invite link or the last saved room.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const inviteCode = params.get('room');
+      const savedCode = localStorage.getItem('friendsBingoRoomCode');
+      const code = inviteCode || savedCode;
 
-    if (code) setRoomCode(code.toUpperCase());
+      if (code) {
+        setRoomCode(code.toUpperCase());
+      }
+    } catch (error) {
+      console.error('Could not load saved room code:', error);
+    }
   }, []);
 
   // Save this browser session's cards and personal marks.
@@ -120,7 +140,70 @@ export default function App() {
 
     return user;
   }
+  // Automatically recover the last room after a page refresh.
+  useEffect(() => {
+    let cancelled = false;
 
+    async function recoverLastRoom() {
+      if (!supabaseConfigured || !supabase) return;
+
+      let savedCode = '';
+
+      try {
+        const params = new URLSearchParams(window.location.search);
+        savedCode =
+          params.get('room') ||
+          localStorage.getItem('friendsBingoRoomCode') ||
+          '';
+      } catch (error) {
+        console.error('Could not read saved room code:', error);
+        return;
+      }
+
+      if (!savedCode) return;
+
+      try {
+        await ensureAnonymousSession();
+
+        const { data, error } = await supabase.rpc(
+          'recover_bingo_player',
+          { p_room_code: savedCode.trim().toUpperCase() }
+        );
+
+        if (error) throw error;
+        if (cancelled || !data?.room || !data?.player) return;
+
+        const recoveredCards = (data.cards || []).map(card => ({
+          ...card,
+          localMarks: {}
+        }));
+
+        setRoom(data.room);
+        setPlayer(data.player);
+        setCards(recoveredCards);
+        setCalled(data.room.called_numbers || []);
+        setRoomCode(data.room.room_code);
+        setName(data.player.player_name || '');
+        setPlayers([{
+          id: data.player.id,
+          player_name: data.player.player_name
+        }]);
+        setMessage(
+          `Welcome back to room ${data.room.room_code}! Your room has been restored.`
+        );
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Could not recover the previous room:', error.message);
+        }
+      }
+    }
+
+    recoverLastRoom();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Refresh the shared player list.
   useEffect(() => {
     if (!room?.id || !player?.id || !supabase) return;
@@ -184,11 +267,39 @@ export default function App() {
 
     const channel = supabase
       .channel(`bingo-room-${room.id}`)
-      .on('broadcast', { event: 'bingo-called' }, ({ payload }) => {
-        if (payload?.player_name) {
-          setMessage(`🍀 ${payload.player_name} called BINGO! The host can verify the card.`);
-        }
-      })
+      
+.on('broadcast', { event: 'bingo-called' }, ({ payload }) => {
+  if (
+    !payload?.claim_id ||
+    !payload?.player_id ||
+    !Array.isArray(payload.cards)
+  ) {
+    return;
+  }
+
+  const claim = {
+    claim_id: payload.claim_id,
+    player_id: payload.player_id,
+    player_name: payload.player_name || 'A player',
+    cards: payload.cards.map(card => ({
+      ...card,
+      status: 'pending'
+    }))
+  };
+
+  setBingoClaims(current => {
+    if (current.some(item => item.claim_id === claim.claim_id)) {
+      return current;
+    }
+
+    return [...current, claim];
+  });
+
+  setMessage(
+    `🍀 ${claim.player_name} called BINGO on ${claim.cards.length} card(s)!`
+  );
+})
+
       .subscribe();
 
     roomChannelRef.current = channel;
@@ -199,23 +310,56 @@ export default function App() {
     };
   }, [room?.id, player?.id]);
 
+  
   async function announceBingo() {
-    if (!room || !player) return;
+    if (!room || !player || !cards.length) return;
 
-    setMessage(`🍀 You called BINGO! Waiting for the host to verify your card.`);
+    if (selectedBingoCards.length === 0) {
+      setMessage('Please select at least one card before calling BINGO.');
+      return;
+    }
+
+    const claimId = `${player.id}-${Date.now()}`;
+
+    const declaredCards = cards
+      .filter(card => selectedBingoCards.includes(card.id))
+      .map(card => ({
+        card_id: card.id,
+        card_number: card.card_number,
+        numbers: Array.isArray(card.numbers) ? card.numbers : [],
+        marked: Object.keys(card.localMarks || {})
+          .filter(index => card.localMarks[index])
+          .map(Number)
+      }));
+
+    if (!roomChannelRef.current) {
+      setMessage('Room connection is not ready. Please try again.');
+      return;
+    }
 
     try {
-      if (roomChannelRef.current) {
-        await roomChannelRef.current.send({
-          type: 'broadcast',
-          event: 'bingo-called',
-          payload: { player_name: player.player_name || name || 'A player' }
-        });
-      }
+      const { error } = await roomChannelRef.current.send({
+        type: 'broadcast',
+        event: 'bingo-called',
+        payload: {
+          claim_id: claimId,
+          player_id: player.id,
+          player_name: player.player_name || name || 'A player',
+          cards: declaredCards
+        }
+      });
+
+      if (error) throw error;
+
+      setSelectedBingoCards([]);
+      setMessage(
+        `🍀 You called BINGO with ${declaredCards.length} card(s)! Waiting for the host to verify.`
+      );
     } catch (error) {
-      setMessage(`BINGO! Your announcement may not have reached everyone: ${error.message}`);
+      setMessage(`Could not announce BINGO: ${error.message}`);
     }
   }
+
 
   // Refresh called numbers and game state for everyone in the room.
   useEffect(() => {
@@ -535,6 +679,119 @@ async function joinRoom() {
     );
   }
 
+function checkBingoCard(numbers, calledNumbers) {
+  if (!Array.isArray(numbers) || numbers.length !== 25) {
+    return { valid: false, pattern: [] };
+  }
+
+  const isCovered = index =>
+    numbers[index] === 'FREE' ||
+    calledNumbers.includes(numbers[index]);
+
+  const patterns = [];
+
+  // Check all five rows.
+  for (let row = 0; row < 5; row++) {
+    patterns.push(
+      Array.from({ length: 5 }, (_, col) => row * 5 + col)
+    );
+  }
+
+  // Check all five columns.
+  for (let col = 0; col < 5; col++) {
+    patterns.push(
+      Array.from({ length: 5 }, (_, row) => row * 5 + col)
+    );
+  }
+
+  // Check both diagonals.
+  patterns.push([0, 6, 12, 18, 24]);
+  patterns.push([4, 8, 12, 16, 20]);
+
+  const winningPattern = patterns.find(pattern =>
+    pattern.every(isCovered)
+  );
+
+  return {
+    valid: Boolean(winningPattern),
+    pattern: winningPattern || []
+  };
+}
+
+
+async function reviewBingoCard(claimId, cardId, decision) {
+  if (!room || !player || busy) return;
+
+  if (player.id !== room.host_player_id) {
+    setMessage('Only the host can review BINGO claims.');
+    return;
+  }
+
+  const claim = bingoClaims.find(item => item.claim_id === claimId);
+  const card = claim?.cards.find(item => item.card_id === cardId);
+
+  if (!claim || !card || card.status !== 'pending') return;
+
+  if (decision === 'approved') {
+    const result = checkBingoCard(card.numbers, called);
+
+    if (!result.valid) {
+      setMessage(
+        `Card ${card.card_number} does not have a valid winning pattern.`
+      );
+      return;
+    }
+  }
+
+  setBusy(true);
+
+  try {
+    if (decision === 'approved') {
+      const { error } = await supabase.rpc('confirm_bingo_winner', {
+        p_room_id: room.id,
+        p_winner_name: claim.player_name
+      });
+
+      if (error) throw error;
+
+      const { data, error: historyError } = await supabase.rpc(
+        'get_bingo_winner_history',
+        { p_room_id: room.id }
+      );
+
+      if (historyError) throw historyError;
+
+      setWinnerHistory(Array.isArray(data) ? data : []);
+    }
+
+    setBingoClaims(current =>
+      current.map(item =>
+        item.claim_id !== claimId
+          ? item
+          : {
+              ...item,
+              cards: item.cards.map(currentCard =>
+                currentCard.card_id !== cardId
+                  ? currentCard
+                  : { ...currentCard, status: decision }
+              )
+            }
+      )
+    );
+
+    setMessage(
+      decision === 'approved'
+        ? `🏆 Card ${card.card_number} approved for ${claim.player_name}.`
+        : `Card ${card.card_number} denied for ${claim.player_name}.`
+    );
+  } catch (error) {
+    setMessage(`Could not review this card: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
+
   async function copyInviteLink() {
     if (!room) return;
 
@@ -739,6 +996,78 @@ async function joinRoom() {
             </p>
           </section>
 
+          <section className="panel bingo-claims-panel">
+            <h2>🍀 BINGO Claims</h2>
+            <p className="hint">
+              Players who call BINGO will appear here while waiting for the host to review their cards.
+            </p>
+
+            {bingoClaims.length === 0 ? (
+              <p className="hint">No BINGO claims yet.</p>
+            ) : (
+              bingoClaims.map(claim => (
+                <article className="bingo-claim" key={claim.claim_id}>
+                  <h3>{claim.player_name}</h3>
+
+                  {claim.cards.map(card => {
+                    const result = checkBingoCard(card.numbers, called);
+                    const status = card.status || 'pending';
+
+                    return (
+                      <div className="bingo-claim-card" key={card.card_id}>
+                        <p>
+                          Card {card.card_number} —{' '}
+                          <strong>
+                            {status === 'approved'
+                              ? '✅ Approved'
+                              : status === 'denied'
+                                ? '❌ Denied'
+                                : result.valid
+                                  ? '⏳ Valid pattern found — awaiting host'
+                                  : '⚠️ No valid winning pattern'}
+                          </strong>
+                        </p>
+
+                        {result.valid && (
+                          <p className="hint">
+                            Winning pattern: {result.pattern.map(index => card.numbers[index]).join(', ')}
+                          </p>
+                        )}
+
+                        {player?.id === room?.host_player_id && status === 'pending' && (
+                          <div className="bingo-review-buttons">
+                            <button
+                              className="primary"
+                              type="button"
+                              disabled={busy || !result.valid || status !== 'pending'}
+                              onClick={() =>
+                                reviewBingoCard(claim.claim_id, card.card_id, 'approved')
+                              }
+                            >
+                              ✅ Approve Card {card.card_number}
+                            </button>
+
+                            <button
+                              className="secondary"
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                reviewBingoCard(claim.claim_id, card.card_id, 'denied')
+                              }
+                            >
+                              ❌ Deny Card {card.card_number}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </article>
+              ))
+            )}
+          </section>
+
+
           <section className="panel winner-history-panel">
             <h2>🏆 Winner History</h2>
             <p className="hint">Confirmed winners for this room. This list stays when the host restarts the game.</p>
@@ -784,6 +1113,23 @@ async function joinRoom() {
             {cards.map(card => (
               <article className="bcard" key={card.id}>
                 <h3>Card {card.card_number}</h3>
+
+<h3>Card {card.card_number}</h3>
+
+<label className="bingo-card-select">
+  <input
+    type="checkbox"
+    checked={selectedBingoCards.includes(card.id)}
+    onChange={event => {
+      setSelectedBingoCards(current =>
+        event.target.checked
+          ? [...current, card.id]
+          : current.filter(id => id !== card.id)
+      );
+    }}
+  />
+  Select this card for BINGO
+</label>
 
                 <div className="grid">
                   {letters.map(letter => (
