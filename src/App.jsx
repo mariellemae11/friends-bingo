@@ -1,5 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   supabase,
   supabaseConfigured,
@@ -84,6 +85,7 @@ const [selectedBingoCards, setSelectedBingoCards] = useState([]);
   const [musicPlaying, setMusicPlaying] = useState(true);
   const roomChannelRef = useRef(null);
 const hasLeftRoomRef = useRef(false);
+  const isHost = Boolean(player?.id && room?.host_player_id && player.id === room.host_player_id);
   // Remember the last room code in this browser.
   useEffect(() => {
     if (roomCode) {
@@ -840,7 +842,7 @@ async function reviewBingoCard(claimId, cardId, decision) {
   }
 
   return (
-    <main className="shell">
+    <main className={`shell ${room && !isHost ? 'guest-view' : ''}`}>
       <header>
         <img className="logo" src="/finger-family-logo.jpg" alt="Finger Family emblem logo" />
         <div>
@@ -848,6 +850,72 @@ async function reviewBingoCard(claimId, cardId, decision) {
           <p>Play together. Win together. · 75-ball bingo</p>
         </div>
       </header>
+
+      <style>{`
+        /* Guest-only styling: host layout remains unchanged. */
+        .guest-view { display: flex; flex-direction: column; gap: 10px; }
+        .guest-view > header { order: 1; margin-bottom: 0; padding-bottom: 10px; }
+        .guest-view > .roombar { display: none; }
+        .guest-view > .music-panel {
+          position: fixed !important; right: 16px !important; bottom: 16px !important;
+          left: auto !important; top: auto !important; transform: none !important;
+          z-index: 1002; order: 2; padding: 0; margin: 0; width: auto; min-width: 0;
+          display: flex; align-items: center; justify-content: flex-end;
+          background: transparent !important; border: 0 !important; box-shadow: none !important;
+        }
+        .guest-view > .music-panel h2,
+        .guest-view > .music-panel > p,
+        .guest-view > .music-panel .music-player { position: fixed; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+        .guest-view > .music-panel .music-controls { margin: 0; }
+        .guest-view > .music-panel button { padding: 9px 13px; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.28); }
+        .guest-view > .caller { order: 7; padding: 12px; }
+        .guest-view > .room-exit-controls { order: 9; padding: 8px; }
+        .guest-view > .room-exit-controls button { width: 100%; }
+        .guest-view > .panel:not(.music-panel):not(.caller):not(.room-exit-controls):not(.bingo-call-panel) { display: none; }
+        .guest-view > h2 { order: 3; margin: 2px 0 0; font-size: 1rem; display: flex; align-items: center; justify-content: space-between; }
+        .guest-view .guest-card-count { font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 999px; background: rgba(255,255,255,.12); }
+        .guest-view > p.hint:not(.message) { order: 4; margin: 0; }
+        .guest-view > .cards { order: 5; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .guest-view .bcard { min-width: 0; padding: 7px; }
+        .guest-view .bcard h3 { margin: 2px 0 6px; text-align: center; }
+        .guest-view .bingo-card-select { display: flex; align-items: center; gap: 5px; margin: 4px 0 6px; font-size: .68rem; line-height: 1.2; }
+        .guest-view .bingo-card-select input { width: 14px; height: 14px; margin: 0; accent-color: #d7b65e; flex: 0 0 auto; }
+        .guest-view .grid { gap: 3px; }
+        .guest-view .grid button { min-width: 0; padding: 4px 0; font-size: 0.78rem; }
+        /* The guest BINGO control is portaled to document.body so centered shell styles
+           cannot pull the fixed button into the middle of the screen. */
+        .guest-floating-bingo {
+          position: fixed !important; right: 16px !important; bottom: 76px !important;
+          left: auto !important; top: auto !important; transform: none !important;
+          z-index: 2147483000; padding: 0; margin: 0; width: auto;
+          text-align: center; display: block; background: transparent !important;
+          border: 0 !important; box-shadow: none !important;
+        }
+        .guest-floating-bingo .hint { display: none !important; }
+        .guest-floating-bingo .bingo-clover-button {
+          position: static !important; left: auto !important; top: auto !important; transform: none !important;
+          z-index: 2147483000; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+          padding: 11px 16px; border-radius: 999px; box-shadow: 0 5px 18px rgba(0,0,0,.35);
+        }
+        .guest-floating-bingo .bingo-clover-button svg { width: 25px; height: 25px; }
+        .guest-floating-bingo .bingo-clover-button span { white-space: nowrap; }
+        .guest-view > .caller .eyebrow { display: block; }
+        .guest-view > .caller .ball { margin: 8px 0; }
+        .guest-view > .caller .history { display: flex; flex-wrap: wrap; gap: 5px; }
+        .guest-view > .caller .history span { padding: 5px 7px; border-radius: 5px; }
+        .guest-view > .caller > button,
+        .guest-view .host-game-controls { display: none !important; }
+        .guest-view > p.hint:last-of-type { order: 10; font-size: 0.7rem; }
+        .guest-view > .message { order: 11; }
+        @media (max-width: 420px) {
+          .guest-view > .music-panel { right: 12px !important; bottom: 12px !important; }
+          .guest-floating-bingo { right: 12px !important; bottom: 68px !important; }
+          .guest-view > .cards { gap: 5px; }
+          .guest-view .bcard { padding: 5px; }
+          .guest-view .grid { gap: 2px; }
+          .guest-view .grid button { font-size: 0.68rem; }
+        }
+      `}</style>
 
       {!room ? (
         <section className="panel">
@@ -906,6 +974,7 @@ async function reviewBingoCard(claimId, cardId, decision) {
         </section>
       ) : (
         <>
+{isHost && (
           <section className="panel roombar">
             <div>
               <span className="eyebrow">ROOM CODE</span>
@@ -916,6 +985,7 @@ async function reviewBingoCard(claimId, cardId, decision) {
               Copy invite link
             </button>
           </section>
+)}
 
           <section className="panel music-panel">
             <h2>🎵 Room Music</h2>
@@ -930,20 +1000,18 @@ async function reviewBingoCard(claimId, cardId, decision) {
                 {musicPlaying ? '⏸ Pause Music' : '▶ Play Music'}
               </button>
             </div>
-            {musicPlaying && (
-              <div className="music-player">
+            <div className="music-player">
                 <iframe
-                  key="finger-family-music"
+                  key={musicPlaying ? "finger-family-music-playing" : "finger-family-music-paused"}
                   width="100%"
                   height="80"
-                  src="https://www.youtube.com/embed/WHwndCEnOec?autoplay=1&controls=1&playsinline=1&rel=0"
+                  src={musicPlaying ? "https://www.youtube.com/embed/WHwndCEnOec?autoplay=1&controls=0&playsinline=1&rel=0" : "about:blank"}
                   title="Finger Family BINGO background music"
                   allow="autoplay; encrypted-media; picture-in-picture"
                   referrerPolicy="strict-origin-when-cross-origin"
                   allowFullScreen
                 />
-              </div>
-            )}
+            </div>
           </section>
 
           <section className="panel caller">
@@ -1015,6 +1083,7 @@ async function reviewBingoCard(claimId, cardId, decision) {
 
                     </section>
 
+{isHost && (
           <section className="panel">
             <h2>Players in this room ({players.length})</h2>
 
@@ -1040,7 +1109,9 @@ async function reviewBingoCard(claimId, cardId, decision) {
                 : 'Player list refreshes automatically every 5 seconds.'}
             </p>
           </section>
+)}
 
+{isHost && (
           <section className="panel bingo-claims-panel">
             <h2>🍀 BINGO Claims</h2>
             <p className="hint">
@@ -1111,8 +1182,10 @@ async function reviewBingoCard(claimId, cardId, decision) {
               ))
             )}
           </section>
+)}
 
 
+{isHost && (
           <section className="panel winner-history-panel">
             <h2>🏆 Winner History</h2>
             <p className="hint">Confirmed winners for this room. This list stays when the host restarts the game.</p>
@@ -1129,14 +1202,19 @@ async function reviewBingoCard(claimId, cardId, decision) {
               </ol>
             )}
           </section>
+)}
 
-          <h2>Your four cards</h2>
+          <h2 className={isHost ? '' : 'guest-cards-heading'}>
+            {isHost ? 'Your four cards' : 'Your Bingo Cards'}
+            {!isHost && <span className="guest-card-count">{cards.length} Cards</span>}
+          </h2>
 
           <p className="hint">
             When a number is called, tap that number on your card to highlight
             it. Your marks are private to you.
           </p>
 
+          {isHost && (
           <section className="panel bingo-call-panel">
             <p className="hint">Got five in a row? Tap the clover to call BINGO!</p>
             <button className="bingo-clover-button" type="button" onClick={announceBingo} aria-label="Call BINGO">
@@ -1153,13 +1231,12 @@ async function reviewBingoCard(claimId, cardId, decision) {
               <span>BINGO!</span>
             </button>
           </section>
+          )}
 
           <div className="cards">
             {cards.map(card => (
               <article className="bcard" key={card.id}>
                 <h3>Card {card.card_number}</h3>
-
-<h3>Card {card.card_number}</h3>
 
 <label className="bingo-card-select">
   <input
@@ -1218,14 +1295,36 @@ async function reviewBingoCard(claimId, cardId, decision) {
             ))}
           </div>
 
-          <p className="hint">
-            Card marks are saved in this browser tab's session. They are not
-            shared with other players. Secure Bingo win verification still
-            needs to be added.
-          </p>
+          {isHost && (
+            <p className="hint">
+              Card marks are saved in this browser tab's session. They are not
+              shared with other players. Secure Bingo win verification still
+              needs to be added.
+            </p>
+          )}
 
           {message && <p className="message">{message}</p>}
         </>
+      )}
+
+
+      {room && !isHost && createPortal(
+        <section className="guest-floating-bingo" aria-label="BINGO controls">
+          <button className="bingo-clover-button" type="button" onClick={announceBingo} aria-label="Call BINGO">
+            <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+              <g fill="currentColor" stroke="#d7b65e" strokeWidth="2">
+                <ellipse cx="50" cy="25" rx="13" ry="19" />
+                <ellipse cx="72" cy="41" rx="13" ry="19" transform="rotate(72 72 41)" />
+                <ellipse cx="64" cy="66" rx="13" ry="19" transform="rotate(144 64 66)" />
+                <ellipse cx="36" cy="66" rx="13" ry="19" transform="rotate(216 36 66)" />
+                <ellipse cx="28" cy="41" rx="13" ry="19" transform="rotate(288 28 41)" />
+              </g>
+              <path d="M50 58 Q53 78 39 94" fill="none" stroke="#d7b65e" strokeWidth="5" strokeLinecap="round" />
+            </svg>
+            <span>BINGO!</span>
+          </button>
+        </section>,
+        document.body
       )}
 
       <footer>Made for game night with Finger Family 💚</footer>
