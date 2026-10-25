@@ -358,18 +358,38 @@ const hasLeftRoomRef = useRef(false);
       return;
     }
 
+    const selectedCards = cards.filter(card => selectedBingoCards.includes(card.id));
+    if (selectedCards.length === 0) {
+      setMessage('Please select at least one card before calling BINGO.');
+      return;
+    }
+
+    // A card must have a real winning pattern made from numbers the guest has
+    // both marked and that the host has already called. FREE counts automatically.
+    const invalidCards = selectedCards.filter(card => {
+      const marked = Object.keys(card.localMarks || {})
+        .filter(index => card.localMarks[index])
+        .map(Number);
+      return !checkBingoCard(card.numbers, called, marked).valid;
+    });
+
+    if (invalidCards.length > 0) {
+      setMessage(
+        `BINGO not sent. Card${invalidCards.length > 1 ? 's' : ''} ${invalidCards.map(card => card.card_number).join(', ')} ${invalidCards.length > 1 ? 'do' : 'does'} not have a complete marked winning pattern yet. Mark every number in a row, column, diagonal, or complete Blackout before calling BINGO.`
+      );
+      return;
+    }
+
     const claimId = `${player.id}-${Date.now()}`;
 
-    const declaredCards = cards
-      .filter(card => selectedBingoCards.includes(card.id))
-      .map(card => ({
-        card_id: card.id,
-        card_number: card.card_number,
-        numbers: Array.isArray(card.numbers) ? card.numbers : [],
-        marked: Object.keys(card.localMarks || {})
-          .filter(index => card.localMarks[index])
-          .map(Number)
-      }));
+    const declaredCards = selectedCards.map(card => ({
+      card_id: card.id,
+      card_number: card.card_number,
+      numbers: Array.isArray(card.numbers) ? card.numbers : [],
+      marked: Object.keys(card.localMarks || {})
+        .filter(index => card.localMarks[index])
+        .map(Number)
+    }));
 
     if (!roomChannelRef.current) {
       setMessage('Room connection is not ready. Please try again.');
@@ -740,11 +760,14 @@ async function joinRoom() {
 
         const marks = card.localMarks || {};
 
+        // Marking is one-way during a round to prevent accidental unmarking.
+        if (marks[index]) return card;
+
         return {
           ...card,
           localMarks: {
             ...marks,
-            [index]: !marks[index]
+            [index]: true
           }
         };
       })
@@ -759,17 +782,20 @@ function checkBingoCard(numbers, calledNumbers, markedIndices = []) {
   const isCalled = index => numbers[index] === 'FREE' || calledNumbers.includes(numbers[index]);
   const markedSet = new Set(markedIndices.map(Number));
   const isMarked = index => numbers[index] === 'FREE' || markedSet.has(index);
+  // Standard patterns require both a called number and the guest's mark.
+  const isMarkedAndCalled = index => isCalled(index) && isMarked(index);
   const patterns = [];
 
   for (let row = 0; row < 5; row++) {
-    patterns.push({ name: `Row ${row + 1}`, indexes: Array.from({ length: 5 }, (_, col) => row * 5 + col), covered: isCalled });
+    patterns.push({ name: `Row ${row + 1}`, indexes: Array.from({ length: 5 }, (_, col) => row * 5 + col), covered: isMarkedAndCalled });
   }
   for (let col = 0; col < 5; col++) {
-    patterns.push({ name: `Column ${col + 1}`, indexes: Array.from({ length: 5 }, (_, row) => row * 5 + col), covered: isCalled });
+    patterns.push({ name: `Column ${col + 1}`, indexes: Array.from({ length: 5 }, (_, row) => row * 5 + col), covered: isMarkedAndCalled });
   }
-  patterns.push({ name: 'Diagonal', indexes: [0, 6, 12, 18, 24], covered: isCalled });
-  patterns.push({ name: 'Diagonal', indexes: [4, 8, 12, 16, 20], covered: isCalled });
-  patterns.push({ name: 'Blackout', indexes: Array.from({ length: 25 }, (_, index) => index), covered: isMarked });
+  patterns.push({ name: 'Diagonal', indexes: [0, 6, 12, 18, 24], covered: isMarkedAndCalled });
+  patterns.push({ name: 'Diagonal', indexes: [4, 8, 12, 16, 20], covered: isMarkedAndCalled });
+  // Blackout requires all 24 numbered spaces to be marked; FREE is automatic.
+  patterns.push({ name: 'Blackout', indexes: Array.from({ length: 25 }, (_, index) => index), covered: isMarkedAndCalled });
 
   const winningPattern = patterns.find(pattern => pattern.indexes.every(pattern.covered));
   return {
@@ -1356,7 +1382,7 @@ async function reviewBingoCard(claimId, cardId, decision) {
                             isFree
                               ? 'Free space'
                               : isCalled
-                                ? 'Click to mark or unmark'
+                                ? (card.localMarks?.[index] ? 'Already marked for this round' : 'Click once to mark; it cannot be unmarked')
                                 : 'Waiting for this number to be called'
                           }
                         >
