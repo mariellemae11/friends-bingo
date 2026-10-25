@@ -56,6 +56,17 @@ function getBallLabel(number) {
   return `${letters[Math.floor((number - 1) / 15)]} ${number}`;
 }
 
+function markCalledOnCards(cardList, calledNumbers) {
+  const calledSet = new Set(calledNumbers || []);
+  return (cardList || []).map(card => {
+    const marks = { ...(card.localMarks || {}) };
+    (Array.isArray(card.numbers) ? card.numbers : []).forEach((number, index) => {
+      if (number !== 'FREE' && calledSet.has(number)) marks[index] = true;
+    });
+    return { ...card, localMarks: marks };
+  });
+}
+
 function getSavedCards() {
   try {
     return JSON.parse(
@@ -72,6 +83,7 @@ export default function App() {
   const [room, setRoom] = useState(null);
   const [player, setPlayer] = useState(null);
   const [cards, setCards] = useState(getSavedCards);
+  const [cardCount, setCardCount] = useState(4);
   const [called, setCalled] = useState([]);
   const [players, setPlayers] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -87,6 +99,11 @@ const [selectedBingoCards, setSelectedBingoCards] = useState([]);
   const [verificationModal, setVerificationModal] = useState(null);
   const [musicPlaying, setMusicPlaying] = useState(true);
   const roomChannelRef = useRef(null);
+  const lastCalledRef = useRef(null);
+  const cardsRef = useRef(cards);
+  const keptCardIdsRef = useRef(keptCardIds);
+  useEffect(() => { cardsRef.current = cards; }, [cards]);
+  useEffect(() => { keptCardIdsRef.current = keptCardIds; }, [keptCardIds]);
 const hasLeftRoomRef = useRef(false);
   const isHost = Boolean(player?.id && room?.host_player_id && player.id === room.host_player_id);
   useEffect(() => {
@@ -375,7 +392,7 @@ const hasLeftRoomRef = useRef(false);
 
     if (invalidCards.length > 0) {
       setMessage(
-        `BINGO not sent. Card${invalidCards.length > 1 ? 's' : ''} ${invalidCards.map(card => card.card_number).join(', ')} ${invalidCards.length > 1 ? 'do' : 'does'} not have a complete marked winning pattern yet. Mark every number in a row, column, diagonal, or complete Blackout before calling BINGO.`
+        `BINGO not sent. Card${invalidCards.length > 1 ? 's' : ''} ${invalidCards.map(card => card.card_number).join(', ')} ${invalidCards.length > 1 ? 'do' : 'does'} not have a complete marked winning pattern yet. Mark every number in a row, column, diagonal, Four Corners, or complete Blackout before calling BINGO.`
       );
       return;
     }
@@ -436,11 +453,34 @@ const hasLeftRoomRef = useRef(false);
         if (error) throw error;
 
         if (!cancelled && data) {
-          setCalled(
-            Array.isArray(data.called_numbers)
-              ? data.called_numbers
-              : []
-          );
+          const nextCalled = Array.isArray(data.called_numbers) ? data.called_numbers : [];
+          const previousCalled = lastCalledRef.current;
+          if (Array.isArray(previousCalled) && previousCalled.length > 0 && nextCalled.length === 0) {
+            // Each player refreshes only their own cards after the host restarts.
+            // Use current refs so the polling callback never relies on stale state.
+            const currentCards = cardsRef.current || [];
+            const kept = new Set([
+              ...(keptCardIdsRef.current || []),
+              ...currentCards.filter(card => card.keep_card).map(card => card.id)
+            ]);
+            const refreshedCards = currentCards.map(card => kept.has(card.id)
+              ? { ...card, localMarks: {} }
+              : { ...card, numbers: makeCard(), localMarks: {} });
+            setCards(refreshedCards);
+            cardsRef.current = refreshedCards;
+            setSelectedBingoCards([]);
+            setBingoClaims([]);
+            supabase.rpc('replace_my_bingo_cards', {
+              p_room_id: room.id,
+              p_cards: refreshedCards.map(card => ({ id: card.id, numbers: card.numbers, keep_card: kept.has(card.id) }))
+            }).then(({ error: saveError }) => {
+              if (saveError) console.error('Could not save refreshed cards:', saveError.message);
+            });
+          }
+          lastCalledRef.current = nextCalled;
+          setCalled(nextCalled);
+          if (isHost) setCards(currentCards => markCalledOnCards(currentCards, nextCalled));
+          if (Number.isInteger(data.card_count) && data.card_count >= 1 && data.card_count <= 6) setCardCount(data.card_count);
 
           setRoom(current =>
             current
@@ -467,7 +507,49 @@ const hasLeftRoomRef = useRef(false);
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [room?.id, player?.id]);
+  }, [room?.id, player?.id, isHost, cards, keptCardIds]);
+
+  // Keep every player's cards synchronized when the host changes the room-wide count.
+  useEffect(() => {
+    if (!room?.id || !player?.id || !supabase) return;
+    let cancelled = false;
+
+    async function syncRoomCardCount() {
+      try {
+        const { data: sharedCount, error: countError } = await supabase.rpc(
+          'get_bingo_room_card_count',
+          { p_room_id: room.id }
+        );
+        if (countError) throw countError;
+        if (cancelled || !Number.isInteger(Number(sharedCount))) return;
+
+        const nextCount = Number(sharedCount);
+        setCardCount(nextCount);
+
+        if (cards.length !== nextCount) {
+          const { data: ownCards, error: cardsError } = await supabase.rpc(
+            'get_my_bingo_cards_for_card_count',
+            { p_room_id: room.id }
+          );
+          if (cardsError) throw cardsError;
+          if (cancelled || !Array.isArray(ownCards)) return;
+          setCards(ownCards.map(card => ({ ...card, localMarks: {} })));
+          setSelectedBingoCards([]);
+          setKeptCardIds([]);
+          setMessage(`The host updated the room to ${nextCount} card${nextCount === 1 ? '' : 's'} per player.`);
+        }
+      } catch (error) {
+        if (!cancelled) console.error('Could not sync room card count:', error.message);
+      }
+    }
+
+    syncRoomCardCount();
+    const timer = window.setInterval(syncRoomCardCount, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [room?.id, player?.id, cards.length]);
 
   async function createRoom() {
     if (!name.trim()) {
@@ -492,7 +574,7 @@ const hasLeftRoomRef = useRef(false);
         const { data, error } = await supabase.rpc('create_bingo_room', {
           p_room_code: makeCode(),
           p_player_name: name.trim(),
-          p_cards: Array.from({ length: 4 }, () => makeCard())
+          p_cards: Array.from({ length: cardCount }, () => makeCard())
         });
 
         if (!error) {
@@ -582,11 +664,23 @@ async function joinRoom() {
         return;
       }
 
-      // If this account has never joined this room, join as a new player.
+      // Read the host's room-wide card count; guests never choose their own count.
+      const { data: roomCardCount, error: countError } = await supabase.rpc(
+        'get_waiting_bingo_card_count',
+        { p_room_code: normalizedRoomCode }
+      );
+      if (countError) throw countError;
+      const guestCardCount = Number(roomCardCount);
+      if (!Number.isInteger(guestCardCount) || guestCardCount < 1 || guestCardCount > 6) {
+        throw new Error("Could not read the host\'s card setting. Please check the room code and try again.");
+      }
+      setCardCount(guestCardCount);
+
+      // Join using exactly the number of cards selected by the host.
       const { data, error } = await supabase.rpc('join_bingo_room', {
         p_room_code: normalizedRoomCode,
         p_player_name: name.trim(),
-        p_cards: Array.from({ length: 4 }, () => makeCard())
+        p_cards: Array.from({ length: guestCardCount }, () => makeCard())
       });
 
       if (error) throw error;
@@ -667,8 +761,9 @@ async function joinRoom() {
       if (error) throw error;
       const nextCalled = Array.isArray(data?.called_numbers) ? data.called_numbers : [];
       setCalled(nextCalled);
-      setCards(current => current.map(card => ({ ...card, localMarks: {} })));
-      setMessage('Game restarted! Same room, fresh round. Winner history was kept.');
+      // Every player, including the host, regenerates their own unkept cards
+      // when their polling loop observes the room-wide reset.
+      setMessage('Game restarted! Everyone’s unkept cards will refresh automatically. Winner history was kept.');
     } catch (error) {
       setMessage(`Could not restart the game: ${error.message}`);
     } finally {
@@ -794,6 +889,7 @@ function checkBingoCard(numbers, calledNumbers, markedIndices = []) {
   }
   patterns.push({ name: 'Diagonal', indexes: [0, 6, 12, 18, 24], covered: isMarkedAndCalled });
   patterns.push({ name: 'Diagonal', indexes: [4, 8, 12, 16, 20], covered: isMarkedAndCalled });
+  patterns.push({ name: 'Four Corners', indexes: [0, 4, 20, 24], covered: isMarkedAndCalled });
   // Blackout requires all 24 numbered spaces to be marked; FREE is automatic.
   patterns.push({ name: 'Blackout', indexes: Array.from({ length: 25 }, (_, index) => index), covered: isMarkedAndCalled });
 
@@ -851,20 +947,15 @@ async function reviewBingoCard(claimId, cardId, decision) {
       setWinnerHistory(Array.isArray(data) ? data : []);
     }
 
-    setBingoClaims(current =>
-      current.map(item =>
-        item.claim_id !== claimId
-          ? item
-          : {
-              ...item,
-              cards: item.cards.map(currentCard =>
-                currentCard.card_id !== cardId
-                  ? currentCard
-                  : { ...currentCard, status: decision }
-              )
-            }
-      )
-    );
+    setBingoClaims(current => current.map(item => {
+      if (item.claim_id !== claimId) return item;
+      const nextCards = decision === 'denied'
+        ? item.cards.filter(currentCard => currentCard.card_id !== cardId)
+        : item.cards.map(currentCard => currentCard.card_id === cardId
+            ? { ...currentCard, status: decision }
+            : currentCard);
+      return { ...item, cards: nextCards };
+    }).filter(item => item.cards.length > 0));
 
     setMessage(
       decision === 'approved'
@@ -1000,6 +1091,16 @@ async function reviewBingoCard(claimId, cardId, decision) {
             />
           </label>
 
+          {!roomCode.trim() && (
+            <label>
+              Number of cards for your room
+              <select value={cardCount} onChange={event => setCardCount(Number(event.target.value))}>
+                {[1, 2, 3, 4, 5, 6].map(count => <option key={count} value={count}>{count} card{count === 1 ? '' : 's'}</option>)}
+              </select>
+              <span className="hint">Choose this only when creating a room. Guests automatically use the host's setting.</span>
+            </label>
+          )}
+
           <button
             className="primary"
             disabled={busy}
@@ -1124,6 +1225,33 @@ async function reviewBingoCard(claimId, cardId, decision) {
               </button>
             )}
 
+            {isHost && (
+              <label className="host-card-count-control">
+                Cards per player
+                <select value={cardCount} disabled={busy} onChange={async event => {
+                  const next = Number(event.target.value);
+                  setCardCount(next);
+                  try {
+                    const { data: roomPlayers, error: playersError } = await supabase.rpc('get_room_players', { p_room_id: room.id });
+                    if (playersError) throw playersError;
+                    const cardsByPlayer = Object.fromEntries((roomPlayers || []).map(roomPlayer => [
+                      roomPlayer.id,
+                      Array.from({ length: next }, () => makeCard())
+                    ]));
+                    const { error } = await supabase.rpc('set_room_bingo_card_count', {
+                      p_room_id: room.id, p_card_count: next, p_cards_by_player: cardsByPlayer
+                    });
+                    if (error) throw error;
+                    const { data: ownCards, error: ownCardsError } = await supabase.rpc('get_my_bingo_cards_for_card_count', { p_room_id: room.id });
+                    if (ownCardsError) throw ownCardsError;
+                    if (Array.isArray(ownCards)) setCards(ownCards.map(card => ({ ...card, localMarks: {} })));
+                    setMessage(`Room updated to ${next} card${next === 1 ? '' : 's'} per player.`);
+                  } catch (error) { setMessage(`Could not change card count: ${error.message}`); }
+                }}>
+                  {[1, 2, 3, 4, 5, 6].map(count => <option key={count} value={count}>{count}</option>)}
+                </select>
+              </label>
+            )}
             {player?.id === room?.host_player_id && (
               <div className="host-game-controls">
                 <button className="secondary" type="button" disabled={busy} onClick={restartGame}>
@@ -1296,7 +1424,7 @@ async function reviewBingoCard(claimId, cardId, decision) {
 )}
 
           <h2 className={isHost ? '' : 'guest-cards-heading'}>
-            {isHost ? 'Your four cards' : 'Your Bingo Cards'}
+            {isHost ? `Your ${cards.length} card${cards.length === 1 ? '' : 's'}` : 'Your Bingo Cards'}
             {!isHost && <span className="guest-card-count">{cards.length} Cards</span>}
           </h2>
 
@@ -1347,8 +1475,16 @@ async function reviewBingoCard(claimId, cardId, decision) {
   <label className="bingo-card-select keep-card-option">
     <input
       type="checkbox"
-      checked={keptCardIds.includes(card.id)}
-      onChange={event => setKeptCardIds(current => event.target.checked ? [...new Set([...current, card.id])] : current.filter(id => id !== card.id))}
+      checked={keptCardIds.includes(card.id) || Boolean(card.keep_card)}
+      onChange={async event => {
+       const shouldKeep = event.target.checked;
+       setKeptCardIds(current => shouldKeep ? [...new Set([...current, card.id])] : current.filter(id => id !== card.id));
+       setCards(current => current.map(item => item.id === card.id ? { ...item, keep_card: shouldKeep } : item));
+       try {
+         const { error } = await supabase.rpc('set_bingo_card_keep', { p_room_id: room.id, p_card_id: card.id, p_keep_card: shouldKeep });
+         if (error) throw error;
+       } catch (error) { setMessage(`Could not save Keep this card: ${error.message}`); }
+     }}
     />
     Keep this card
   </label>
@@ -1430,7 +1566,7 @@ async function reviewBingoCard(claimId, cardId, decision) {
                         </span>
                       ))}
                     </div>
-                    <p className="hint">{result.valid ? `Highlighted pattern: ${result.patternName}` : 'No completed row, column, diagonal, or blackout detected.'}</p>
+                    <p className="hint">{result.valid ? `Highlighted pattern: ${result.patternName}` : 'No completed row, column, diagonal, Four Corners, or blackout detected.'}</p>
                   </article>
                 );
               })}
