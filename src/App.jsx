@@ -1,6 +1,5 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
   supabase,
   supabaseConfigured,
@@ -82,10 +81,18 @@ export default function App() {
   const [winnerName, setWinnerName] = useState('');
 const [bingoClaims, setBingoClaims] = useState([]);
 const [selectedBingoCards, setSelectedBingoCards] = useState([]);
+  const [keptCardIds, setKeptCardIds] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('friendsBingoKeptCards') || '[]'); } catch { return []; }
+  });
+  const [verificationModal, setVerificationModal] = useState(null);
   const [musicPlaying, setMusicPlaying] = useState(true);
   const roomChannelRef = useRef(null);
 const hasLeftRoomRef = useRef(false);
   const isHost = Boolean(player?.id && room?.host_player_id && player.id === room.host_player_id);
+  useEffect(() => {
+    try { sessionStorage.setItem('friendsBingoKeptCards', JSON.stringify(keptCardIds)); } catch (error) { console.error('Could not save kept cards:', error); }
+  }, [keptCardIds]);
+
   // Remember the last room code in this browser.
   useEffect(() => {
     if (roomCode) {
@@ -302,6 +309,16 @@ const hasLeftRoomRef = useRef(false);
     `🍀 ${claim.player_name} called BINGO on ${claim.cards.length} card(s)!`
   );
 })
+.on('broadcast', { event: 'bingo-verify-start' }, ({ payload }) => {
+  if (!payload?.claim_id || !Array.isArray(payload.cards)) return;
+  setVerificationModal({
+    claim_id: payload.claim_id,
+    player_name: payload.player_name || 'A player',
+    cards: payload.cards,
+    called_numbers: Array.isArray(payload.called_numbers) ? payload.called_numbers : []
+  });
+  setMessage(`🔎 The host is verifying ${payload.player_name || 'a player'}'s BINGO!`);
+})
 
       .subscribe();
 
@@ -314,6 +331,25 @@ const hasLeftRoomRef = useRef(false);
   }, [room?.id, player?.id]);
 
   
+  async function startVerification(claim) {
+    if (!isHost || !room || !claim) return;
+    const modalData = {
+      claim_id: claim.claim_id,
+      player_name: claim.player_name,
+      cards: claim.cards,
+      called_numbers: called
+    };
+    setVerificationModal(modalData);
+    if (roomChannelRef.current) {
+      const { error } = await roomChannelRef.current.send({
+        type: 'broadcast',
+        event: 'bingo-verify-start',
+        payload: modalData
+      });
+      if (error) setMessage(`Opened verification, but could not notify everyone: ${error.message}`);
+    }
+  }
+
   async function announceBingo() {
     if (!room || !player || !cards.length) return;
 
@@ -665,6 +701,8 @@ async function joinRoom() {
     setWinnerName('');
     setBingoClaims([]);
     setSelectedBingoCards([]);
+    setKeptCardIds([]);
+    setVerificationModal(null);
     setRoomCode('');
     setMessage('You have left the game. You can create or join another room.');
 
@@ -676,6 +714,7 @@ async function joinRoom() {
 
     try {
       sessionStorage.removeItem('friendsBingoCards');
+      sessionStorage.removeItem('friendsBingoKeptCards');
     } catch (error) {
       console.error('Could not clear saved cards:', error);
     }
@@ -712,42 +751,31 @@ async function joinRoom() {
     );
   }
 
-function checkBingoCard(numbers, calledNumbers) {
+function checkBingoCard(numbers, calledNumbers, markedIndices = []) {
   if (!Array.isArray(numbers) || numbers.length !== 25) {
-    return { valid: false, pattern: [] };
+    return { valid: false, pattern: [], patternName: '' };
   }
 
-  const isCovered = index =>
-    numbers[index] === 'FREE' ||
-    calledNumbers.includes(numbers[index]);
-
+  const isCalled = index => numbers[index] === 'FREE' || calledNumbers.includes(numbers[index]);
+  const markedSet = new Set(markedIndices.map(Number));
+  const isMarked = index => numbers[index] === 'FREE' || markedSet.has(index);
   const patterns = [];
 
-  // Check all five rows.
   for (let row = 0; row < 5; row++) {
-    patterns.push(
-      Array.from({ length: 5 }, (_, col) => row * 5 + col)
-    );
+    patterns.push({ name: `Row ${row + 1}`, indexes: Array.from({ length: 5 }, (_, col) => row * 5 + col), covered: isCalled });
   }
-
-  // Check all five columns.
   for (let col = 0; col < 5; col++) {
-    patterns.push(
-      Array.from({ length: 5 }, (_, row) => row * 5 + col)
-    );
+    patterns.push({ name: `Column ${col + 1}`, indexes: Array.from({ length: 5 }, (_, row) => row * 5 + col), covered: isCalled });
   }
+  patterns.push({ name: 'Diagonal', indexes: [0, 6, 12, 18, 24], covered: isCalled });
+  patterns.push({ name: 'Diagonal', indexes: [4, 8, 12, 16, 20], covered: isCalled });
+  patterns.push({ name: 'Blackout', indexes: Array.from({ length: 25 }, (_, index) => index), covered: isMarked });
 
-  // Check both diagonals.
-  patterns.push([0, 6, 12, 18, 24]);
-  patterns.push([4, 8, 12, 16, 20]);
-
-  const winningPattern = patterns.find(pattern =>
-    pattern.every(isCovered)
-  );
-
+  const winningPattern = patterns.find(pattern => pattern.indexes.every(pattern.covered));
   return {
     valid: Boolean(winningPattern),
-    pattern: winningPattern || []
+    pattern: winningPattern?.indexes || [],
+    patternName: winningPattern?.name || ''
   };
 }
 
@@ -766,7 +794,7 @@ async function reviewBingoCard(claimId, cardId, decision) {
   if (!claim || !card || card.status !== 'pending') return;
 
   if (decision === 'approved') {
-    const result = checkBingoCard(card.numbers, called);
+    const result = checkBingoCard(card.numbers, called, card.marked || []);
 
     if (!result.valid) {
       setMessage(
@@ -869,6 +897,20 @@ async function reviewBingoCard(claimId, cardId, decision) {
         .guest-view > .music-panel .music-controls { margin: 0; }
         .guest-view > .music-panel button { padding: 9px 13px; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.28); }
         .guest-view > .caller { order: 7; padding: 12px; }
+        .guest-view .caller-topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .guest-view .caller-topline .ball { margin: 8px 0; }
+        .guest-view .caller-bingo-button { flex: 0 0 auto; background: transparent; border: 0; box-shadow: none; padding: 0; display: inline-flex; flex-direction: column; align-items: center; color: #f5d47a; }
+        .guest-view .caller-bingo-button svg { width: 42px; height: 42px; }
+        .guest-view .caller-bingo-button span { font-weight: 800; letter-spacing: .08em; }
+        .bingo-verification-backdrop { position: fixed; inset: 0; z-index: 2147483600; background: rgba(0,0,0,.78); display: flex; align-items: center; justify-content: center; padding: 16px; }
+        .bingo-verification-modal { width: min(760px, 100%); max-height: 90vh; overflow: auto; background: #063225; color: #f7f2d8; border: 1px solid #d7b65e; border-radius: 16px; padding: 18px; box-shadow: 0 20px 70px rgba(0,0,0,.55); }
+        .bingo-verification-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+        .bingo-verification-card { border: 1px solid rgba(215,182,94,.5); border-radius: 10px; padding: 10px; }
+        .bingo-verification-grid { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 3px; margin-top: 8px; }
+        .bingo-verification-grid span { display: flex; align-items: center; justify-content: center; min-height: 34px; background: #e9ebdc; color: #15372c; border-radius: 4px; font-size: .85rem; }
+        .bingo-verification-grid span.pattern-hit { background: #f5d47a; color: #17372b; font-weight: 800; outline: 2px solid #d7b65e; }
+        .bingo-verification-grid span.free-space { background: #b9efd2; }
+        .bingo-verification-grid .letter { background: #14543e; color: #f5d47a; font-weight: 800; }
         .guest-view > .room-exit-controls { order: 9; padding: 8px; }
         .guest-view > .room-exit-controls button { width: 100%; }
         .guest-view > .panel:not(.music-panel):not(.caller):not(.room-exit-controls):not(.bingo-call-panel) { display: none; }
@@ -878,6 +920,7 @@ async function reviewBingoCard(claimId, cardId, decision) {
         .guest-view > .cards { order: 5; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
         .guest-view .bcard { min-width: 0; padding: 7px; }
         .guest-view .bcard h3 { margin: 2px 0 6px; text-align: center; }
+        .guest-view .bingo-card-options { display: flex; flex-direction: column; gap: 3px; }
         .guest-view .bingo-card-select { display: flex; align-items: center; gap: 5px; margin: 4px 0 6px; font-size: .68rem; line-height: 1.2; }
         .guest-view .bingo-card-select input { width: 14px; height: 14px; margin: 0; accent-color: #d7b65e; flex: 0 0 auto; }
         .guest-view .grid { gap: 3px; }
@@ -1015,12 +1058,28 @@ async function reviewBingoCard(claimId, cardId, decision) {
           </section>
 
           <section className="panel caller">
-            <span className="eyebrow">LAST NUMBER CALLED</span>
-
-            <div className="ball">
-              {called.length
-                ? getBallLabel(called[called.length - 1])
-                : '—'}
+            <div className="caller-topline">
+              <div>
+                <span className="eyebrow">LAST NUMBER CALLED</span>
+                <div className="ball">
+                  {called.length ? getBallLabel(called[called.length - 1]) : '—'}
+                </div>
+              </div>
+              {!isHost && (
+                <button className="caller-bingo-button" type="button" onClick={announceBingo} aria-label="Call BINGO">
+                  <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+                    <g fill="currentColor" stroke="#d7b65e" strokeWidth="2">
+                      <ellipse cx="50" cy="25" rx="13" ry="19" />
+                      <ellipse cx="72" cy="41" rx="13" ry="19" transform="rotate(72 72 41)" />
+                      <ellipse cx="64" cy="66" rx="13" ry="19" transform="rotate(144 64 66)" />
+                      <ellipse cx="36" cy="66" rx="13" ry="19" transform="rotate(216 36 66)" />
+                      <ellipse cx="28" cy="41" rx="13" ry="19" transform="rotate(288 28 41)" />
+                    </g>
+                    <path d="M50 58 Q53 78 39 94" fill="none" stroke="#d7b65e" strokeWidth="5" strokeLinecap="round" />
+                  </svg>
+                  <span>BINGO!</span>
+                </button>
+              )}
             </div>
 
             <p>{called.length} of 75 numbers called</p>
@@ -1126,7 +1185,7 @@ async function reviewBingoCard(claimId, cardId, decision) {
                   <h3>{claim.player_name}</h3>
 
                   {claim.cards.map(card => {
-                    const result = checkBingoCard(card.numbers, called);
+                    const result = checkBingoCard(card.numbers, called, card.marked || []);
                     const status = card.status || 'pending';
 
                     return (
@@ -1146,8 +1205,14 @@ async function reviewBingoCard(claimId, cardId, decision) {
 
                         {result.valid && (
                           <p className="hint">
-                            Winning pattern: {result.pattern.map(index => card.numbers[index]).join(', ')}
+                            Pattern found: {result.patternName} · {result.pattern.map(index => card.numbers[index]).join(', ')}
                           </p>
+                        )}
+
+                        {isHost && status === 'pending' && (
+                          <button className="secondary" type="button" onClick={() => startVerification(claim)}>
+                            🔎 Let's verify
+                          </button>
                         )}
 
                         {player?.id === room?.host_player_id && status === 'pending' && (
@@ -1238,20 +1303,30 @@ async function reviewBingoCard(claimId, cardId, decision) {
               <article className="bcard" key={card.id}>
                 <h3>Card {card.card_number}</h3>
 
-<label className="bingo-card-select">
-  <input
-    type="checkbox"
-    checked={selectedBingoCards.includes(card.id)}
-    onChange={event => {
-      setSelectedBingoCards(current =>
-        event.target.checked
-          ? [...current, card.id]
-          : current.filter(id => id !== card.id)
-      );
-    }}
-  />
-  Select this card for BINGO
-</label>
+<div className="bingo-card-options">
+  <label className="bingo-card-select">
+    <input
+      type="checkbox"
+      checked={selectedBingoCards.includes(card.id)}
+      onChange={event => {
+        setSelectedBingoCards(current =>
+          event.target.checked
+            ? [...current, card.id]
+            : current.filter(id => id !== card.id)
+        );
+      }}
+    />
+    Select for BINGO
+  </label>
+  <label className="bingo-card-select keep-card-option">
+    <input
+      type="checkbox"
+      checked={keptCardIds.includes(card.id)}
+      onChange={event => setKeptCardIds(current => event.target.checked ? [...new Set([...current, card.id])] : current.filter(id => id !== card.id))}
+    />
+    Keep this card
+  </label>
+</div>
 
                 <div className="grid">
                   {letters.map(letter => (
@@ -1308,23 +1383,35 @@ async function reviewBingoCard(claimId, cardId, decision) {
       )}
 
 
-      {room && !isHost && createPortal(
-        <section className="guest-floating-bingo" aria-label="BINGO controls">
-          <button className="bingo-clover-button" type="button" onClick={announceBingo} aria-label="Call BINGO">
-            <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
-              <g fill="currentColor" stroke="#d7b65e" strokeWidth="2">
-                <ellipse cx="50" cy="25" rx="13" ry="19" />
-                <ellipse cx="72" cy="41" rx="13" ry="19" transform="rotate(72 72 41)" />
-                <ellipse cx="64" cy="66" rx="13" ry="19" transform="rotate(144 64 66)" />
-                <ellipse cx="36" cy="66" rx="13" ry="19" transform="rotate(216 36 66)" />
-                <ellipse cx="28" cy="41" rx="13" ry="19" transform="rotate(288 28 41)" />
-              </g>
-              <path d="M50 58 Q53 78 39 94" fill="none" stroke="#d7b65e" strokeWidth="5" strokeLinecap="round" />
-            </svg>
-            <span>BINGO!</span>
-          </button>
-        </section>,
-        document.body
+
+
+      {verificationModal && (
+        <div className="bingo-verification-backdrop" role="dialog" aria-modal="true" aria-label="BINGO card verification">
+          <section className="bingo-verification-modal">
+            <h2>🍀 Let's verify BINGO!</h2>
+            <p><strong>{verificationModal.player_name}</strong> called BINGO. Everyone can review the submitted card pattern below.</p>
+            <div className="bingo-verification-cards">
+              {verificationModal.cards.map(card => {
+                const result = checkBingoCard(card.numbers, verificationModal.called_numbers || [], card.marked || []);
+                return (
+                  <article className="bingo-verification-card" key={card.card_id}>
+                    <h3>Card {card.card_number} · {result.valid ? result.patternName : 'Pattern not confirmed'}</h3>
+                    <div className="bingo-verification-grid">
+                      {letters.map(letter => <span className="letter" key={letter}>{letter}</span>)}
+                      {(card.numbers || []).map((number, index) => (
+                        <span key={index} className={`${result.pattern.includes(index) ? 'pattern-hit' : ''} ${number === 'FREE' ? 'free-space' : ''}`}>
+                          {number}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="hint">{result.valid ? `Highlighted pattern: ${result.patternName}` : 'No completed row, column, diagonal, or blackout detected.'}</p>
+                  </article>
+                );
+              })}
+            </div>
+            <button className="primary" type="button" onClick={() => setVerificationModal(null)}>Close verification</button>
+          </section>
+        </div>
       )}
 
       <footer>Made for game night with Finger Family 💚</footer>
